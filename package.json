@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3030",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -13,6 +13,8 @@
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource-variable/newsreader": "^5.3.0",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.118.0",
     "next": "16.4.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -24,7 +26,7 @@
     "@types/node": "^22.20.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "eslint": "^9",
+    "eslint": "^10.13.0",
     "eslint-config-next": "16.4.3",
     "tailwindcss": "^4",
     "typescript": "^5",
