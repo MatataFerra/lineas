@@ -3,7 +3,8 @@
 import { ArrowLeftIcon } from "@/components/icons";
 import { LANE_META, NODE_KIND_LABEL } from "@/lib/graph/labels";
 import { otherEnd } from "@/lib/graph/queries";
-import { useLineas } from "@/lib/store";
+import { bookSnapshot, useLineas } from "@/lib/store";
+import { LibraryNotice } from "@/features/library/library-notice";
 import { ConfidenceBadge, EdgeTypeBadge } from "./connection-badges";
 import type { GraphModel, Selection, ViewState } from "./model";
 
@@ -18,8 +19,8 @@ interface PathPanelProps {
 /** Panel lateral del mapa (desktop): el recorrido, un nodo o una conexión. */
 export function PathPanel({ model, view, selection, onSelect, laneDot }: PathPanelProps) {
   const { index, graph } = model;
-  const saved = useLineas((s) => s.saved);
-  const toggleSaved = useLineas((s) => s.toggleSaved);
+  const library = useLineas((s) => s.library);
+  const toggleLibrary = useLineas((s) => s.toggleLibrary);
   const back = () => onSelect({ kind: "path" });
 
   if (selection.kind === "node") {
@@ -79,7 +80,7 @@ export function PathPanel({ model, view, selection, onSelect, laneDot }: PathPan
 
   const rec = view.rec;
   const target = index.nodes.get(rec.nodeId)!;
-  const isSaved = !!saved[target.id];
+  const isSaved = !!library[target.id]?.statuses.saved;
   return (
     <div key={rec.nodeId} className="animate-fade">
       <div className="flex items-center gap-2 text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
@@ -119,12 +120,13 @@ export function PathPanel({ model, view, selection, onSelect, laneDot }: PathPan
         <button
           type="button"
           aria-pressed={isSaved}
-          onClick={() => toggleSaved(target.id)}
+          onClick={() => void toggleLibrary(bookSnapshot(target), "saved")}
           className={`h-[42px] flex-1 rounded-full border border-accent text-[13px] font-medium ${isSaved ? "text-accent" : "bg-accent text-accent-ink"}`}
         >
           {isSaved ? "Guardado ✓" : "Guardar"}
         </button>
       </div>
+      <LibraryNotice active={isSaved} />
     </div>
   );
 }

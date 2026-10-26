@@ -6,7 +6,9 @@ Líneas recomienda libros a partir de **pistas**: un libro, un autor, una frase,
 
 ## Estado
 
-Prototipo funcional con **datos de ejemplo**. El flujo completo (inicio → pistas → resultados → conexiones) funciona en desktop y mobile. El motor de recomendación todavía devuelve un grafo fijo (`src/lib/graph/mock.ts`). Todavía no se llama a ningún modelo ni hay base de datos.
+Prototipo funcional. El flujo completo (inicio → pistas → resultados → conexiones) funciona en desktop y mobile. El motor de recomendación todavía devuelve un grafo fijo (`src/lib/graph/mock.ts`); todavía no se llama a ningún modelo.
+
+Con Supabase configurado hay login por enlace mágico, biblioteca persistida (guardados / leídos) e historial de búsquedas. Sin variables de entorno la app funciona igual, en modo local.
 
 ## Stack
 
@@ -19,15 +21,26 @@ Prototipo funcional con **datos de ejemplo**. El flujo completo (inicio → pist
 ## Desarrollo
 
 ```bash
-npm install
-npm run dev        # http://localhost:3000
-npm test           # tests del contrato del grafo y del layout
-npm run lint
-npm run typecheck
-npm run build
+pnpm install
+pnpm dev           # http://localhost:3030
+pnpm test          # tests del contrato del grafo y del layout
+pnpm lint
+pnpm typecheck
+pnpm build
 ```
 
-Copiá `.env.example` a `.env.local` cuando empecemos a conectar servicios. Hoy no hace falta ninguna variable.
+## Supabase
+
+1. Copiá `.env.example` a `.env.local` con la URL y la publishable key (dashboard → **Connect** → **App Frameworks** → **Next.js**).
+2. Aplicá la migración `supabase/migrations/20261026200000_init.sql`: pegala en **SQL Editor**, o con el CLI (`pnpm dlx supabase link` y `pnpm dlx supabase db push`).
+3. En **Authentication → URL Configuration**: *Site URL* `http://localhost:3030` (y la de producción cuando exista) y en *Redirect URLs* agregá `http://localhost:3030/auth/callback` y `https://<tu-dominio>/auth/callback`.
+
+Tablas (todas con RLS, cada usuario ve solo lo suyo):
+
+- `library_items`: guardados y leídos (`status` = `saved` | `read`), con una copia mínima del libro.
+- `searches`: pistas y el grafo completo de cada búsqueda.
+
+La sesión se refresca en `src/proxy.ts` (en Next 16 `proxy` reemplaza a `middleware`). Lo que se marca antes de iniciar sesión se sube a la cuenta al entrar.
 
 ## Estructura
 
@@ -38,6 +51,9 @@ src/
     resultados/page.tsx      Tres carriles de recomendaciones
     conexiones/page.tsx      Mapa (desktop) / recorrido vertical (mobile)
     api/recommend/route.ts   POST { clues } → ConnectionGraph validado
+    auth/callback/route.ts   canje del enlace mágico (PKCE)
+    ingresar/page.tsx        login por email
+    biblioteca/page.tsx      Mi biblioteca
   features/
     clues/                   Home, modal/pantalla de pistas, catálogo de sugerencias
     results/                 Pantalla de resultados
@@ -48,7 +64,10 @@ src/
     graph/queries.ts         índices, saltos, aristas de un recorrido
     graph/mock.ts            grafo de ejemplo (validado al cargar)
     recommend/engine.ts      motor de recomendación (hoy: mock)
-    store.ts                 estado de la sesión (pistas, grafo, guardados)
+    supabase/                clientes de navegador y servidor, tipos de la base
+    store.ts                 estado de la sesión (pistas, grafo, usuario, biblioteca)
+  proxy.ts                   refresco de sesión de Supabase
+supabase/migrations/         SQL versionado
 ```
 
 ## El contrato del grafo
@@ -66,5 +85,5 @@ La validación garantiza también la integridad referencial: las aristas apuntan
 
 1. **Motor LLM** en `src/lib/recommend/engine.ts`: salida estructurada con el JSON Schema de `z.toJSONSchema(ConnectionGraphSchema)`, validación y reintento.
 2. **Verificación de libros** contra Google Books / Open Library (`book.verified`, `coverUrl`) y búsqueda real en el modal de pistas.
-3. **Supabase**: login, biblioteca, historial de búsquedas y cache de grafos.
+3. **Tus búsquedas**: pantalla de historial (los datos ya se guardan) y cache de grafos en el servidor.
 4. **Deploy en Vercel.**

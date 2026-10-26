@@ -8,7 +8,8 @@ import { SiteHeader } from "@/components/site-header";
 import { LANE_META, LANE_ORDER } from "@/lib/graph/labels";
 import { recommendationsByLane } from "@/lib/graph/queries";
 import type { ConnectionGraph, GraphNode, Lane, Recommendation } from "@/lib/graph/schema";
-import { useLineas } from "@/lib/store";
+import { bookSnapshot, useLineas } from "@/lib/store";
+import { LibraryNotice } from "@/features/library/library-notice";
 
 export function ResultsScreen() {
   const clues = useLineas((s) => s.clues);
@@ -120,17 +121,15 @@ function Lanes({ graph, mobileLane }: { graph: ConnectionGraph; mobileLane: Lane
 
 function LaneCard({ lane, recs, nodes }: { lane: Lane; recs: Recommendation[]; nodes: Map<string, GraphNode> }) {
   const [index, setIndex] = useState(0);
-  const saved = useLineas((s) => s.saved);
-  const read = useLineas((s) => s.read);
-  const toggleSaved = useLineas((s) => s.toggleSaved);
-  const toggleRead = useLineas((s) => s.toggleRead);
+  const library = useLineas((s) => s.library);
+  const toggleLibrary = useLineas((s) => s.toggleLibrary);
   const setFocus = useLineas((s) => s.setFocus);
 
   if (recs.length === 0) return null;
   const rec = recs[index % recs.length];
   const node = nodes.get(rec.nodeId)!;
-  const isSaved = !!saved[node.id];
-  const isRead = !!read[node.id];
+  const isSaved = !!library[node.id]?.statuses.saved;
+  const isRead = !!library[node.id]?.statuses.read;
   const author = node.book?.author ?? node.subtitle ?? "";
   const meta = LANE_META[lane];
 
@@ -173,7 +172,7 @@ function LaneCard({ lane, recs, nodes }: { lane: Lane; recs: Recommendation[]; n
           <button
             type="button"
             aria-pressed={isSaved}
-            onClick={() => toggleSaved(node.id)}
+            onClick={() => void toggleLibrary(bookSnapshot(node), "saved")}
             className={`h-[42px] flex-1 rounded-full border border-accent text-[13px] font-medium ${isSaved ? "text-accent" : "bg-accent text-accent-ink"}`}
           >
             {isSaved ? "Guardado ✓" : "Guardar"}
@@ -181,12 +180,13 @@ function LaneCard({ lane, recs, nodes }: { lane: Lane; recs: Recommendation[]; n
           <button
             type="button"
             aria-pressed={isRead}
-            onClick={() => toggleRead(node.id)}
+            onClick={() => void toggleLibrary(bookSnapshot(node), "read")}
             className={`h-[42px] flex-1 rounded-full border border-line text-[13px] ${isRead ? "bg-chip" : ""}`}
           >
             {isRead ? "Leído ✓" : "Ya lo leí"}
           </button>
         </div>
+        <LibraryNotice active={isSaved || isRead} />
         {recs.length > 1 && (
           <button type="button" onClick={() => setIndex((i) => i + 1)} className="mt-1.5 h-10 text-xs text-muted hover:text-ink">
             No es lo que busco · ver otra
