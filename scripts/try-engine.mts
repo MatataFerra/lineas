@@ -42,6 +42,13 @@ const generated = await generateGraphWithLlm(clues, {
   log: (event) => {
     if (event.type === "attempt") console.log(`→ intento ${event.attempt}…`);
     if (event.type === "invalid") console.log(`  inválido:\n${event.reason.replace(/^/gm, "    ")}`);
+    if (event.type === "salvaged") {
+      const parts = [
+        event.droppedRecommendations.length ? `recomendaciones descartadas: ${event.droppedRecommendations.join(", ")}` : "",
+        event.droppedEdges.length ? `aristas descartadas: ${event.droppedEdges.join(", ")}` : "",
+      ].filter(Boolean);
+      console.log(`  rescatado sin reintentar · ${parts.join(" · ")}`);
+    }
     if (event.type === "success") {
       const total = event.usage.reduce(
         (acc, u) => ({ in: acc.in + u.prompt_tokens, hit: acc.hit + (u.prompt_cache_hit_tokens ?? 0), out: acc.out + u.completion_tokens }),
@@ -52,7 +59,11 @@ const generated = await generateGraphWithLlm(clues, {
   },
 });
 const llmMs = Date.now() - started;
-const graph = await verifyGraphBooks(generated, { googleBooksKey: process.env.GOOGLE_BOOKS_API_KEY });
+const misses: string[] = [];
+const graph = await verifyGraphBooks(generated, {
+  googleBooksKey: process.env.GOOGLE_BOOKS_API_KEY,
+  onMiss: (report) => misses.push(`  ${report.title} (${report.author}): ${report.tried.map((t) => `${t.source} «${t.query}» → ${t.outcome}`).join(" · ")}`),
+});
 const totalMs = Date.now() - started;
 
 const nodes = new Map(graph.nodes.map((n) => [n.id, n]));
@@ -70,6 +81,10 @@ for (const lane of LANE_ORDER) {
 
 const dropped = generated.recommendations.filter((r) => !graph.recommendations.some((g) => g.nodeId === r.nodeId));
 if (dropped.length) console.log(`\nDescartadas por no verificarse: ${dropped.map((r) => nodes.get(r.nodeId)?.label).join(", ")}`);
+if (misses.length) console.log(`\nNo encontrados en catálogos:\n${misses.join("\n")}`);
+if (misses.some((m) => m.includes("google") && m.includes("http-"))) {
+  console.log("  → Google Books respondió con error. Sin GOOGLE_BOOKS_API_KEY la cuota es compartida y se agota rápido.");
+}
 
 const byType = Object.groupBy(graph.edges, (e) => EDGE_META[e.type].label);
 const byConfidence = Object.groupBy(graph.edges, (e) => CONFIDENCE_META[e.confidence].label);

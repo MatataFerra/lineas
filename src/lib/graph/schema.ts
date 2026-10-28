@@ -88,6 +88,8 @@ export const GraphNodeSchema = z.object({
   label: z.string().min(1).max(80),
   /** Línea secundaria: autor, disciplina, "Corriente de ideas". */
   subtitle: z.string().max(60).optional(),
+  /** Para libros traducidos: el título original ("L'Étranger"). Ayuda a verificarlo en catálogos. */
+  originalTitle: z.string().max(120).optional(),
   era: EraSchema,
   /** El nodo corresponde a una pista del usuario: es un punto de partida. */
   isClue: z.boolean().default(false),
@@ -217,12 +219,35 @@ export const ConnectionGraphSchema = z
       if (e.type === "shared_phrase" && !e.quote) {
         ctx.addIssue({ code: "custom", path: ["edges", i, "quote"], message: "Una frase compartida necesita la frase" });
       }
+      const source = nodes.get(e.source);
+      const target = nodes.get(e.target);
+      if (source && target) {
+        if (e.type === "same_author" && (source.kind !== "book" || target.kind !== "book")) {
+          ctx.addIssue({ code: "custom", path: ["edges", i, "type"], message: `${e.id}: same_author une dos libros, no ${source.kind} y ${target.kind}` });
+        }
+        if (e.type === "belongs_to" && target.kind !== "movement" && target.kind !== "concept") {
+          ctx.addIssue({ code: "custom", path: ["edges", i, "type"], message: `${e.id}: el destino de belongs_to tiene que ser un movimiento o una idea` });
+        }
+        // Una influencia va de lo anterior a lo posterior (con 2 años de tolerancia).
+        if ((e.type === "influence" || e.type === "other_arts") && representativeYear(source) > representativeYear(target) + 2) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["edges", i, "source"],
+            message: `${e.id}: ${e.source} (${source.era.label}) no puede influir en ${e.target} (${target.era.label}), que es anterior; invertí source y target o cambiá el tipo`,
+          });
+        }
+      }
       linked.add(pairKey(e.source, e.target));
     });
 
     const perLane = new Map<Lane, number>();
+    const recommended = new Set<string>();
     graph.recommendations.forEach((rec, i) => {
       perLane.set(rec.lane, (perLane.get(rec.lane) ?? 0) + 1);
+      if (recommended.has(rec.nodeId)) {
+        ctx.addIssue({ code: "custom", path: ["recommendations", i, "nodeId"], message: `${rec.nodeId} está recomendado más de una vez` });
+      }
+      recommended.add(rec.nodeId);
       const target = nodes.get(rec.nodeId);
       if (!target) {
         ctx.addIssue({ code: "custom", path: ["recommendations", i, "nodeId"], message: `Nodo inexistente: ${rec.nodeId}` });
@@ -267,6 +292,12 @@ export const ConnectionGraphSchema = z
 export type ConnectionGraph = z.infer<typeof ConnectionGraphSchema>;
 /** Forma de entrada (antes de aplicar defaults), útil para escribir datos a mano. */
 export type ConnectionGraphInput = z.input<typeof ConnectionGraphSchema>;
+
+function representativeYear(node: { era: { from: number; to?: number; pivot?: number } }): number {
+  const { from, to, pivot } = node.era;
+  if (pivot !== undefined) return pivot;
+  return to === undefined ? from : Math.round((from + to) / 2);
+}
 
 export function pairKey(a: string, b: string): string {
   return a < b ? `${a}|${b}` : `${b}|${a}`;

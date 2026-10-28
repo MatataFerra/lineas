@@ -1,0 +1,482 @@
+{
+  "version": 1,
+  "clues": [
+    {
+      "id": "c1",
+      "kind": "book",
+      "label": "On the Road"
+    },
+    {
+      "id": "c2",
+      "kind": "movement",
+      "label": "Generación Beat"
+    },
+    {
+      "id": "c3",
+      "kind": "feeling",
+      "label": "La libertad"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "on-the-road",
+      "kind": "book",
+      "label": "On the Road",
+      "subtitle": "Jack Kerouac",
+      "era": {
+        "from": 1957,
+        "label": "1957"
+      },
+      "isClue": true,
+      "book": {
+        "author": "Jack Kerouac",
+        "isbn": "999835398X",
+        "openLibraryKey": "/works/OL65906W",
+        "coverUrl": "https://covers.openlibrary.org/b/id/34655-M.jpg",
+        "verified": true
+      }
+    },
+    {
+      "id": "generacion-beat",
+      "kind": "movement",
+      "label": "Generación Beat",
+      "subtitle": "Movimiento literario",
+      "era": {
+        "from": 1944,
+        "to": 1965,
+        "label": "1944–1965"
+      },
+      "isClue": true
+    },
+    {
+      "id": "la-libertad",
+      "kind": "concept",
+      "label": "La libertad",
+      "subtitle": "Corriente de ideas",
+      "era": {
+        "from": 1944,
+        "to": 1970,
+        "label": "posguerra"
+      },
+      "isClue": true
+    },
+    {
+      "id": "jack-kerouac",
+      "kind": "person",
+      "label": "Jack Kerouac",
+      "subtitle": "Escritor",
+      "era": {
+        "from": 1922,
+        "to": 1969,
+        "label": "1922–1969",
+        "pivot": 1957
+      },
+      "isClue": false
+    },
+    {
+      "id": "allen-ginsberg",
+      "kind": "person",
+      "label": "Allen Ginsberg",
+      "subtitle": "Poeta",
+      "era": {
+        "from": 1926,
+        "to": 1997,
+        "label": "1926–1997",
+        "pivot": 1956
+      },
+      "isClue": false
+    },
+    {
+      "id": "charlie-parker",
+      "kind": "art",
+      "label": "Charlie Parker",
+      "subtitle": "Música · bebop",
+      "era": {
+        "from": 1920,
+        "to": 1955,
+        "label": "1940s",
+        "pivot": 1945
+      },
+      "isClue": false
+    },
+    {
+      "id": "el-perseguidor",
+      "kind": "book",
+      "label": "El perseguidor",
+      "subtitle": "Julio Cortázar",
+      "era": {
+        "from": 1959,
+        "label": "1959"
+      },
+      "isClue": false,
+      "book": {
+        "author": "Julio Cortázar",
+        "isbn": "9788420646107",
+        "openLibraryKey": "/works/OL14944540W",
+        "coverUrl": "https://covers.openlibrary.org/b/id/4903873-M.jpg",
+        "verified": true
+      }
+    },
+    {
+      "id": "rayuela",
+      "kind": "book",
+      "label": "Rayuela",
+      "subtitle": "Julio Cortázar",
+      "era": {
+        "from": 1963,
+        "label": "1963"
+      },
+      "isClue": false,
+      "book": {
+        "author": "Julio Cortázar",
+        "isbn": "8400071123",
+        "openLibraryKey": "/works/OL14860424W",
+        "coverUrl": "https://covers.openlibrary.org/b/id/1047466-M.jpg",
+        "verified": true
+      }
+    },
+    {
+      "id": "howl",
+      "kind": "book",
+      "label": "Aullido",
+      "subtitle": "Allen Ginsberg",
+      "era": {
+        "from": 1956,
+        "label": "1956"
+      },
+      "isClue": false,
+      "book": {
+        "author": "Allen Ginsberg",
+        "isbn": "9788433971043",
+        "openLibraryKey": "/works/OL4624425W",
+        "coverUrl": "https://covers.openlibrary.org/b/id/3326907-M.jpg",
+        "verified": true
+      }
+    },
+    {
+      "id": "el-extranjero",
+      "kind": "book",
+      "label": "El extranjero",
+      "subtitle": "Albert Camus",
+      "era": {
+        "from": 1942,
+        "label": "1942"
+      },
+      "isClue": false,
+      "book": {
+        "author": "Albert Camus",
+        "verified": false
+      }
+    },
+    {
+      "id": "los-detectives-salvajes",
+      "kind": "book",
+      "label": "Los detectives salvajes",
+      "subtitle": "Roberto Bolaño",
+      "era": {
+        "from": 1998,
+        "label": "1998"
+      },
+      "isClue": false,
+      "book": {
+        "author": "Roberto Bolaño",
+        "isbn": "9789933352707",
+        "openLibraryKey": "/works/OL712032W",
+        "coverUrl": "https://covers.openlibrary.org/b/id/3706128-M.jpg",
+        "verified": true
+      }
+    },
+    {
+      "id": "las-ciudades-invisibles",
+      "kind": "book",
+      "label": "Las ciudades invisibles",
+      "subtitle": "Italo Calvino",
+      "era": {
+        "from": 1972,
+        "label": "1972"
+      },
+      "isClue": false,
+      "book": {
+        "author": "Italo Calvino",
+        "verified": false
+      }
+    },
+    {
+      "id": "viaje-al-fin-de-la-noche",
+      "kind": "book",
+      "label": "Viaje al fin de la noche",
+      "subtitle": "Louis-Ferdinand Céline",
+      "era": {
+        "from": 1932,
+        "label": "1932"
+      },
+      "isClue": false,
+      "book": {
+        "author": "Louis-Ferdinand Céline",
+        "verified": false
+      }
+    },
+    {
+      "id": "moby-dick",
+      "kind": "book",
+      "label": "Moby-Dick",
+      "subtitle": "Herman Melville",
+      "era": {
+        "from": 1851,
+        "label": "1851"
+      },
+      "isClue": false,
+      "book": {
+        "author": "Herman Melville",
+        "isbn": "9781480067080",
+        "openLibraryKey": "/works/OL102749W",
+        "coverUrl": "https://covers.openlibrary.org/b/id/10544254-M.jpg",
+        "verified": true
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-kerouac-road",
+      "source": "jack-kerouac",
+      "target": "on-the-road",
+      "type": "same_author",
+      "confidence": "documented",
+      "summary": "Kerouac escribió la novela en un rollo continuo.",
+      "explanation": "On the Road es la novela más conocida de Kerouac, escrita en 1951 sobre un rollo de papel de un solo trazo y publicada en 1957."
+    },
+    {
+      "id": "e-ginsberg-beat",
+      "source": "allen-ginsberg",
+      "target": "generacion-beat",
+      "type": "belongs_to",
+      "confidence": "documented",
+      "summary": "Ginsberg fue una de las voces centrales del grupo.",
+      "explanation": "Ginsberg, Kerouac y Burroughs formaron el núcleo de la Generación Beat en Nueva York y San Francisco a fines de los años cuarenta y en los cincuenta."
+    },
+    {
+      "id": "e-road-beat",
+      "source": "on-the-road",
+      "target": "generacion-beat",
+      "type": "belongs_to",
+      "confidence": "documented",
+      "summary": "La novela se volvió el emblema del movimiento.",
+      "explanation": "La publicación de On the Road en 1957 dio a la Generación Beat su texto más leído y su imagen pública de viaje y desapego."
+    },
+    {
+      "id": "e-libertad-road",
+      "source": "la-libertad",
+      "target": "on-the-road",
+      "type": "shared_theme",
+      "confidence": "scholarly",
+      "summary": "El viaje como forma de escapar de las normas.",
+      "explanation": "La novela presenta el cruce del país como una búsqueda de libertad personal frente al trabajo fijo y la vida doméstica de la posguerra."
+    },
+    {
+      "id": "e-libertad-beat",
+      "source": "la-libertad",
+      "target": "generacion-beat",
+      "type": "shared_theme",
+      "confidence": "scholarly",
+      "summary": "Libertad sexual, espiritual y de forma literaria.",
+      "explanation": "El movimiento Beat reivindicó una libertad que era a la vez vital y formal: rechazo de la censura, del academicismo y de la métrica cerrada."
+    },
+    {
+      "id": "e-parker-perseguidor",
+      "source": "charlie-parker",
+      "target": "el-perseguidor",
+      "type": "other_arts",
+      "confidence": "documented",
+      "summary": "El saxofonista Parker inspira al personaje Johnny Carter.",
+      "explanation": "Cortázar modeló a Johnny Carter, el músico de El perseguidor, sobre Charlie Parker, incluida su adicción y su muerte temprana."
+    },
+    {
+      "id": "e-parker-road",
+      "source": "charlie-parker",
+      "target": "on-the-road",
+      "type": "other_arts",
+      "confidence": "scholarly",
+      "summary": "La prosa de Kerouac imita la improvisación del bebop.",
+      "explanation": "Kerouac buscó una escritura espontánea, sin correcciones, con el ritmo de respiración y fraseo del jazz que escuchaba, en especial el bebop."
+    },
+    {
+      "id": "e-perseguidor-rayuela",
+      "source": "el-perseguidor",
+      "target": "rayuela",
+      "type": "same_author",
+      "confidence": "documented",
+      "summary": "Ambos textos son de Cortázar y comparten la obsesión por el jazz.",
+      "explanation": "El perseguidor forma parte de Las armas secretas; en Rayuela Cortázar retoma el jazz y la figura del músico como centro de la vida del Club de la Serpiente."
+    },
+    {
+      "id": "e-parker-rayuela",
+      "source": "charlie-parker",
+      "target": "rayuela",
+      "type": "other_arts",
+      "confidence": "scholarly",
+      "summary": "El jazz como idioma del Club de la Serpiente.",
+      "explanation": "En Rayuela el jazz y el bebop son el idioma con el que se entiende el Club de la Serpiente; Oliveira escucha a Parker y la música ordena la novela."
+    },
+    {
+      "id": "e-ginsberg-howl",
+      "source": "allen-ginsberg",
+      "target": "howl",
+      "type": "same_author",
+      "confidence": "documented",
+      "summary": "Aullido es el poema más famoso de Ginsberg.",
+      "explanation": "Ginsberg leyó Aullido por primera vez en 1955 en la Six Gallery de San Francisco y lo publicó en 1956; el poema se convirtió en manifiesto del movimiento."
+    },
+    {
+      "id": "e-howl-beat",
+      "source": "howl",
+      "target": "generacion-beat",
+      "type": "belongs_to",
+      "confidence": "documented",
+      "summary": "Poema fundacional de la Generación Beat.",
+      "explanation": "Aullido, con su primera línea sobre las mejores mentes de su generación, fijó el tono y el lenguaje del grupo Beat."
+    },
+    {
+      "id": "e-libertad-howl",
+      "source": "la-libertad",
+      "target": "howl",
+      "type": "shared_theme",
+      "confidence": "scholarly",
+      "summary": "Denuncia de la conformidad y defensa del deseo.",
+      "explanation": "El poema celebra a los que rechazaron la vida normalizada de la posguerra y reivindica el cuerpo, el sexo y la locura como formas de libertad."
+    },
+    {
+      "id": "e-road-celine",
+      "source": "on-the-road",
+      "target": "viaje-al-fin-de-la-noche",
+      "type": "influence",
+      "confidence": "scholarly",
+      "summary": "Kerouac admiraba la lengua oral y descarnada de Céline.",
+      "explanation": "Kerouac leyó a Céline y adoptó su registro coloquial, directo y sin adornos; la crítica señala esa deuda en la prosa espontánea de On the Road."
+    },
+    {
+      "id": "e-celine-extranjero",
+      "source": "viaje-al-fin-de-la-noche",
+      "target": "el-extranjero",
+      "type": "influence",
+      "confidence": "scholarly",
+      "summary": "Una primera persona seca y desengañada.",
+      "explanation": "La narración en primera persona de Céline, sin juicio moral, es una referencia reconocida para el tono neutro y extrañado de El extranjero de Camus."
+    },
+    {
+      "id": "e-extranjero-libertad",
+      "source": "el-extranjero",
+      "target": "la-libertad",
+      "type": "shared_theme",
+      "confidence": "interpretive",
+      "summary": "La libertad como indiferencia ante las normas.",
+      "explanation": "Meursault no se rebela con discurso, pero su indiferencia ante las convenciones sociales y religiosas propone una forma extrema y fría de libertad."
+    },
+    {
+      "id": "e-road-bolanio",
+      "source": "on-the-road",
+      "target": "los-detectives-salvajes",
+      "type": "influence",
+      "confidence": "scholarly",
+      "summary": "El viaje de aprendizaje y la amistad literaria como forma de vida.",
+      "explanation": "Bolaño leyó a los beats y trasladó su modelo de grupo de poetas que viajan y escriben a la juventud mexicana de Los detectives salvajes."
+    },
+    {
+      "id": "e-bolanio-beat",
+      "source": "los-detectives-salvajes",
+      "target": "generacion-beat",
+      "type": "shared_theme",
+      "confidence": "interpretive",
+      "summary": "Comunidad de escritores al margen de las instituciones.",
+      "explanation": "Como los beats, los real visceralistas de Bolaño construyen una comunidad literaria fuera de la academia y de las normas sociales."
+    },
+    {
+      "id": "e-libertad-calvino",
+      "source": "la-libertad",
+      "target": "las-ciudades-invisibles",
+      "type": "shared_theme",
+      "confidence": "interpretive",
+      "summary": "La libertad de imaginar mundos posibles.",
+      "explanation": "Calvino ofrece ciudades que no existen como ejercicio de libertad de la imaginación, una libertad más mental que la de los beats pero igual de radical."
+    },
+    {
+      "id": "e-melville-road",
+      "source": "moby-dick",
+      "target": "on-the-road",
+      "type": "influence",
+      "confidence": "scholarly",
+      "summary": "La travesía como búsqueda obsesiva.",
+      "explanation": "Kerouac leyó a Melville y compartió con él la estructura del viaje como motor narrativo; la crítica ha comparado la huida hacia el oeste con la persecución de la ballena."
+    },
+    {
+      "id": "e-calvino-melville",
+      "source": "moby-dick",
+      "target": "las-ciudades-invisibles",
+      "type": "shared_theme",
+      "confidence": "interpretive",
+      "summary": "Catálogos y enciclopedias dentro de la ficción.",
+      "explanation": "Tanto Melville como Calvino intercalan listas, catálogos y descripciones enciclopédicas que suspenden la trama y expanden el mundo narrado."
+    },
+    {
+      "id": "e-libertad-perseguidor",
+      "source": "la-libertad",
+      "target": "el-perseguidor",
+      "type": "shared_theme",
+      "confidence": "interpretive",
+      "summary": "La búsqueda de una libertad que ningún límite puede contener.",
+      "explanation": "Johnny Carter persigue una música que lo libere de las reglas del oficio y de la vida misma; el cuento presenta esa libertad como una búsqueda sin final posible."
+    }
+  ],
+  "recommendations": [
+    {
+      "nodeId": "rayuela",
+      "lane": "affinity",
+      "pitch": "Si te movió el viaje sin plan y la amistad como forma de vida, Rayuela ofrece lo mismo en París y Buenos Aires, con jazz y una estructura que elige el lector.",
+      "pathSummary": "Del viaje beat al jazz de Parker y de ahí a Cortázar.",
+      "path": [
+        "on-the-road",
+        "charlie-parker",
+        "rayuela"
+      ]
+    },
+    {
+      "nodeId": "howl",
+      "lane": "affinity",
+      "pitch": "El poema que puso en palabras el mismo impulso de On the Road: una generación que se niega a la vida domesticada y lo grita sin métrica.",
+      "pathSummary": "El núcleo del movimiento Beat en su forma poética.",
+      "path": [
+        "generacion-beat",
+        "howl"
+      ]
+    },
+    {
+      "nodeId": "el-perseguidor",
+      "lane": "affinity",
+      "pitch": "Un cuento sobre un músico que quiere tocar la libertad absoluta y no soporta los límites. Cortázar lo escribió mirando a Charlie Parker.",
+      "pathSummary": "La libertad como búsqueda que no se detiene.",
+      "path": [
+        "la-libertad",
+        "el-perseguidor"
+      ]
+    },
+    {
+      "nodeId": "los-detectives-salvajes",
+      "lane": "alternative",
+      "pitch": "El espíritu beat trasladado a México: poetas que viajan, se enamoran y se pierden en lugar de escribir el libro que los haría famosos.",
+      "pathSummary": "La comunidad beat reaparece en la juventud de Bolaño.",
+      "path": [
+        "generacion-beat",
+        "los-detectives-salvajes"
+      ]
+    },
+    {
+      "nodeId": "moby-dick",
+      "lane": "beyond",
+      "pitch": "Un siglo antes, otro viaje con tripulación y obsesión: la travesía como forma de escapar del mundo y perseguir algo que no se deja atrapar. Melville muestra que la ruta puede ser también una condena.",
+      "pathSummary": "El viaje beat hunde sus raíces en la novela marina.",
+      "path": [
+        "on-the-road",
+        "moby-dick"
+      ]
+    }
+  ]
+}
