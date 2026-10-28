@@ -64,10 +64,25 @@ describe("generateGraphWithLlm", () => {
     expect(messages[1].content).toContain("- book: On the Road");
   });
 
-  it("reintenta con los errores de validación cuando un recorrido está roto", async () => {
+  it("descarta una recomendación rota sin pagar otro intento si el carril sigue teniendo dos", async () => {
     const broken = modelOutput((g) => {
       const recs = g.recommendations as { path: string[] }[];
       recs[0].path = ["on-the-road", "siddhartha", "los-vagabundos-del-dharma"];
+    });
+    const events: string[] = [];
+    const { fetch, calls } = fakeFetch(deepseekReply(broken));
+    const graph = await generateGraphWithLlm(CLUES, { ...base, fetch, log: (e) => events.push(e.type) });
+
+    expect(calls).toHaveLength(1);
+    expect(graph.recommendations).toHaveLength(8);
+    expect(graph.recommendations.map((r) => r.nodeId)).not.toContain("los-vagabundos-del-dharma");
+    expect(events).toContain("salvaged");
+  });
+
+  it("reintenta con los errores concretos cuando descartar dejaría un carril pobre", async () => {
+    const broken = modelOutput((g) => {
+      const recs = g.recommendations as { lane: string; path: string[] }[];
+      for (const rec of recs.filter((r) => r.lane === "affinity").slice(0, 2)) rec.path = ["on-the-road", "siddhartha"];
     });
     const { fetch, calls } = fakeFetch(deepseekReply(broken), deepseekReply(modelOutput()));
     const graph = await generateGraphWithLlm(CLUES, { ...base, fetch });
@@ -77,6 +92,16 @@ describe("generateGraphWithLlm", () => {
     const repair = (calls[1].body.messages as { role: string; content: string }[]).at(-1)!;
     expect(repair.role).toBe("user");
     expect(repair.content).toContain("No hay arista entre on-the-road y siddhartha");
+  });
+
+  it("da vuelta una influencia escrita al revés en vez de rechazarla", async () => {
+    const inverted = modelOutput((g) => {
+      const edge = (g.edges as { id: string; source: string; target: string }[]).find((e) => e.id === "wolfe-road")!;
+      [edge.source, edge.target] = [edge.target, edge.source];
+    });
+    const { fetch } = fakeFetch(deepseekReply(inverted));
+    const graph = await generateGraphWithLlm(CLUES, { ...base, fetch });
+    expect(graph.edges.find((e) => e.id === "wolfe-road")).toMatchObject({ source: "thomas-wolfe", target: "on-the-road" });
   });
 
   it("se recupera de JSON inválido y de un error 503", async () => {
@@ -151,7 +176,7 @@ describe("verifyGraphBooks", () => {
       const url = new URL(String(input));
       if (url.hostname === "www.googleapis.com") {
         const q = url.searchParams.get("q") ?? "";
-        const title = q.match(/intitle:(.*) inauthor:/)?.[1] ?? "";
+        const title = q.match(/intitle:"(.*)" inauthor:/)?.[1] ?? "";
         return known[title] ? google(title, known[title]) : nothing();
       }
       // Open Library: solo encuentra Rayuela.
@@ -178,6 +203,30 @@ describe("verifyGraphBooks", () => {
     expect(recs).not.toContain("los-detectives-salvajes");
   });
 
+  it("verifica por el título original cuando el título en español no aparece", async () => {
+    const fetch = (async (input: RequestInfo | URL) => {
+      const q = new URL(String(input)).searchParams.get("q") ?? "";
+      return q.includes("L'Étranger") ? google("L'Étranger", "Albert Camus") : nothing();
+    }) as typeof globalThis.fetch;
+    const input = structuredClone(MOCK_GRAPH);
+    const node = input.nodes.find((n) => n.id === "el-extranjero")!;
+    node.originalTitle = "L'Étranger";
+    const misses: string[] = [];
+    const graph = await verifyGraphBooks(input, { fetch, onMiss: (r) => misses.push(r.title) });
+    expect(graph.nodes.find((n) => n.id === "el-extranjero")?.book?.verified).toBe(true);
+    expect(misses).toContain("Rayuela");
+    expect(misses).not.toContain("El extranjero");
+  });
+
+  it("informa cuando un catálogo responde con error", async () => {
+    const fetch = (async (input: RequestInfo | URL) =>
+      new URL(String(input)).hostname === "www.googleapis.com" ? new Response("{}", { status: 429 }) : nothing()) as typeof globalThis.fetch;
+    const reports: { tried: { source: string; outcome: string }[] }[] = [];
+    await verifyGraphBooks(structuredClone(MOCK_GRAPH), { fetch, onMiss: (r) => reports.push(r) });
+    expect(reports[0].tried[0]).toMatchObject({ source: "google", outcome: "http-429" });
+    expect(reports[0].tried.some((t) => t.source === "openlibrary")).toBe(true);
+  });
+
   it("no rechaza un libro de otro autor con el mismo título", async () => {
     const fetch = (async () => google("Fiesta", "Otra Persona")) as typeof globalThis.fetch;
     const input = structuredClone(MOCK_GRAPH);
@@ -195,5 +244,19 @@ describe("createRateLimiter", () => {
     expect(blocked.ok).toBe(false);
     expect(check("otra-ip", 20).ok).toBe(true);
     expect(check("ip", 1001).ok).toBe(true);
+  });
+});
+
+describe("corrida real (On the Road · Generación Beat · La libertad)", () => {
+  it("da vuelta la influencia Céline → Kerouac y descarta los same_author mal usados", async () => {
+    const { readFileSync } = await import("node:fs");
+    const raw = JSON.parse(readFileSync(new URL("./__fixtures__/run-on-the-road.json", import.meta.url), "utf8"));
+    const normalized = normalizeRawGraph(raw, raw.clues) as { edges: { id: string; source: string; target: string }[] };
+    expect(normalized.edges.find((e) => e.id === "e-road-celine")).toMatchObject({ source: "viaje-al-fin-de-la-noche", target: "on-the-road" });
+
+    const { salvage } = await import("./llm-engine");
+    const rescued = salvage(normalized, 1);
+    expect(rescued?.droppedEdges).toEqual(["e-kerouac-road", "e-ginsberg-howl"]);
+    expect(rescued?.graph.recommendations).toHaveLength(5);
   });
 });

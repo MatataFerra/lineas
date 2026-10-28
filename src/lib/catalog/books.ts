@@ -44,15 +44,59 @@ interface OpenLibraryDoc {
   isbn?: string[];
 }
 
+/** Qué pasó en cada catálogo al buscar un libro: para diagnosticar falsos negativos. */
+export type LookupOutcome = "match" | "no-match" | `http-${number}` | "error";
+
+export interface LookupReport {
+  title: string;
+  author: string;
+  match: CatalogMatch | null;
+  tried: { source: CatalogMatch["source"]; query: string; outcome: LookupOutcome }[];
+}
+
+class HttpError extends Error {
+  constructor(readonly status: number) {
+    super(`HTTP ${status}`);
+  }
+}
+
+/**
+ * Busca un libro probando cada título (el visible y, si hay, el original) en
+ * Google Books y después en Open Library. Devuelve el primer resultado que
+ * coincide en título y apellido del autor, más el detalle de cada intento.
+ */
+export async function lookupBook(titles: string[], author: string, options: CatalogOptions = {}): Promise<LookupReport> {
+  const unique = [...new Set(titles.map((t) => t.trim()).filter(Boolean))];
+  const tried: LookupReport["tried"] = [];
+  const sources = [
+    { source: "google" as const, search: searchGoogle },
+    { source: "openlibrary" as const, search: searchOpenLibrary },
+  ];
+  for (const { source, search } of sources) {
+    for (const title of unique) {
+      try {
+        const match = await search(title, author, options);
+        tried.push({ source, query: title, outcome: match ? "match" : "no-match" });
+        if (match) return { title: unique[0], author, match, tried };
+      } catch (error) {
+        tried.push({ source, query: title, outcome: error instanceof HttpError ? `http-${error.status}` : "error" });
+        // Si el catálogo está caído o nos limitó, no tiene sentido probar otros títulos ahí.
+        break;
+      }
+    }
+  }
+  return { title: unique[0] ?? "", author, match: null, tried };
+}
+
 export async function findBook(title: string, author: string, options: CatalogOptions = {}): Promise<CatalogMatch | null> {
-  return (await searchGoogle(title, author, options).catch(() => null)) ?? (await searchOpenLibrary(title, author, options).catch(() => null));
+  return (await lookupBook([title], author, options)).match;
 }
 
 async function searchGoogle(title: string, author: string, { googleBooksKey, timeoutMs = 5000, fetch: fetchImpl = fetch }: CatalogOptions): Promise<CatalogMatch | null> {
-  const params = new URLSearchParams({ q: `intitle:${title} inauthor:${lastName(author)}`, maxResults: "8", printType: "books" });
+  const params = new URLSearchParams({ q: `intitle:"${title.replace(/"/g, "")}" inauthor:${lastName(author)}`, maxResults: "10", printType: "books" });
   if (googleBooksKey) params.set("key", googleBooksKey);
   const response = await fetchImpl(`https://www.googleapis.com/books/v1/volumes?${params}`, { signal: AbortSignal.timeout(timeoutMs) });
-  if (!response.ok) return null;
+  if (!response.ok) throw new HttpError(response.status);
   const data = (await response.json()) as { items?: GoogleVolume[] };
   const candidates = (data.items ?? []).filter((item) => matches(title, author, item.volumeInfo?.title, item.volumeInfo?.authors));
   if (candidates.length === 0) return null;
@@ -75,7 +119,7 @@ async function searchGoogle(title: string, author: string, { googleBooksKey, tim
 async function searchOpenLibrary(title: string, author: string, { timeoutMs = 5000, fetch: fetchImpl = fetch }: CatalogOptions): Promise<CatalogMatch | null> {
   const params = new URLSearchParams({ title, author: lastName(author), limit: "8", fields: "key,title,author_name,first_publish_year,cover_i,isbn" });
   const response = await fetchImpl(`https://openlibrary.org/search.json?${params}`, { signal: AbortSignal.timeout(timeoutMs) });
-  if (!response.ok) return null;
+  if (!response.ok) throw new HttpError(response.status);
   const data = (await response.json()) as { docs?: OpenLibraryDoc[] };
   const doc = (data.docs ?? []).find((d) => matches(title, author, d.title, d.author_name));
   if (!doc) return null;
@@ -91,10 +135,16 @@ async function searchOpenLibrary(title: string, author: string, { timeoutMs = 50
 }
 
 /** Marca cada libro del grafo como verificado (o no) y descarta recomendaciones dudosas cuando hay alternativas. */
-export async function verifyGraphBooks(graph: ConnectionGraph, options: CatalogOptions = {}): Promise<ConnectionGraph> {
+export async function verifyGraphBooks(
+  graph: ConnectionGraph,
+  options: CatalogOptions & { onMiss?: (report: LookupReport) => void } = {},
+): Promise<ConnectionGraph> {
   const books = graph.nodes.filter((n) => n.kind === "book");
-  const matches = await Promise.all(books.map((n) => findBook(n.label, n.book?.author ?? n.subtitle ?? "", options).catch(() => null)));
-  const byId = new Map(books.map((n, i) => [n.id, matches[i]]));
+  const reports = await Promise.all(
+    books.map((n) => lookupBook([n.label, n.originalTitle ?? ""], n.book?.author ?? n.subtitle ?? "", options)),
+  );
+  for (const report of reports) if (!report.match) options.onMiss?.(report);
+  const byId = new Map(books.map((n, i) => [n.id, reports[i].match]));
 
   const nodes = graph.nodes.map((node) => {
     if (node.kind !== "book") return node;
@@ -125,7 +175,7 @@ export async function verifyGraphBooks(graph: ConnectionGraph, options: CatalogO
 export function normalizeText(value: string): string {
   return value
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();

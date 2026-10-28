@@ -12,6 +12,7 @@ export function normalizeRawGraph(raw: unknown, clues: Clue[]): unknown {
   if (!isRecord(raw)) return raw;
 
   const idMap = new Map<string, string>();
+  const seenNodes = new Set<string>();
   const nodes = asArray(raw.nodes)
     .filter(isRecord)
     .map((node) => {
@@ -25,13 +26,17 @@ export function normalizeRawGraph(raw: unknown, clues: Clue[]): unknown {
         id,
         label: clip(String(node.label ?? ""), 80),
         subtitle,
+        ...(typeof node.originalTitle === "string" && node.originalTitle.trim() ? { originalTitle: clip(node.originalTitle, 120) } : { originalTitle: undefined }),
         isClue: node.isClue === true,
         era: normalizeEra(node.era),
         ...(book ? { book } : {}),
       };
-    });
+    })
+    // Un nodo repetido se queda con la primera aparición.
+    .filter((node) => (seenNodes.has(node.id) ? false : (seenNodes.add(node.id), true)));
 
   const nodeIds = new Set(nodes.map((n) => n.id));
+  const yearById = new Map(nodes.map((n) => [n.id, representativeYear(n.era)]));
   const mapId = (value: unknown) => (typeof value === "string" ? (idMap.get(value) ?? slug(value)) : value);
 
   const seenEdges = new Set<string>();
@@ -46,6 +51,15 @@ export function normalizeRawGraph(raw: unknown, clues: Clue[]): unknown {
       explanation: clip(String(edge.explanation ?? ""), 600),
       ...(typeof edge.quote === "string" ? { quote: clip(edge.quote, 200) } : {}),
     }))
+    .map((edge) => {
+      // Una influencia va de lo anterior a lo posterior. Si el modelo la escribió al revés
+      // (la explicación suele estar bien, solo invirtió los extremos), la damos vuelta.
+      const type = (edge as Record<string, unknown>).type;
+      if (type !== "influence" && type !== "other_arts") return edge;
+      const from = yearById.get(String(edge.source));
+      const to = yearById.get(String(edge.target));
+      return from !== undefined && to !== undefined && from > to + 2 ? { ...edge, source: edge.target, target: edge.source } : edge;
+    })
     .filter((edge) => {
       if (!nodeIds.has(String(edge.source)) || !nodeIds.has(String(edge.target))) return false;
       if (seenEdges.has(edge.id)) edge.id = `${edge.id}-${seenEdges.size}`;
@@ -77,10 +91,16 @@ function normalizeEra(era: unknown): unknown {
   return { from, ...(to !== undefined ? { to } : {}), label, ...(pivot !== undefined ? { pivot } : {}) };
 }
 
+function representativeYear(era: unknown): number | undefined {
+  if (!isRecord(era) || typeof era.from !== "number") return undefined;
+  if (typeof era.pivot === "number") return era.pivot;
+  return typeof era.to === "number" ? Math.round((era.from + era.to) / 2) : era.from;
+}
+
 export function slug(value: string): string {
   return value
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");

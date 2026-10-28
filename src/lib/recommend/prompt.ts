@@ -31,6 +31,7 @@ Node:
   "kind": "book" | "person" | "movement" | "art" | "concept",
   "label": "nombre visible, ≤ 80 caracteres",
   "subtitle": "para book: el autor con nombre completo; para el resto, una línea corta (\\"Poeta\\", \\"Música · bebop\\", \\"Corriente de ideas\\")",
+  "originalTitle": "solo para book traducido: el título original exacto (\\"L'Étranger\\", \\"Le città invisibili\\")",
   "era": { "from": año, "to": año opcional, "label": "texto corto: \\"1957\\", \\"1940s\\", \\"1854–1891\\"", "pivot": año opcional },
   "isClue": true | false
 }
@@ -51,7 +52,12 @@ Edge:
   "quote": "solo en shared_phrase: la frase, ≤ 200 caracteres"
 }
 
-- influence: source inspiró a target (source es anterior). other_arts: igual, pero la influencia viene de otra arte. shared_phrase: la misma frase, título o epígrafe aparece en ambos. shared_theme: comparten un tema o una pregunta (sin dirección). belongs_to: source forma parte de target (libro → movimiento). same_author: dos libros del mismo autor.
+- influence: source inspiró a target. source SIEMPRE es anterior a target (Céline → Kerouac, nunca al revés).
+- other_arts: igual que influence, pero source es de otra arte (música, cine, pintura).
+- shared_phrase: la misma frase, título o epígrafe aparece en ambos.
+- shared_theme: comparten un tema o una pregunta (sin dirección).
+- belongs_to: source (libro o persona) forma parte de target, que es un movement o un concept.
+- same_author: une DOS nodos book del mismo autor. Nunca una persona con su libro.
 - confidence: "documented" solo si existe registro verificable (cartas, entrevistas, dedicatorias, citas textuales, epígrafes). "scholarly" si es una lectura establecida de la crítica. "interpretive" si es un paralelismo que proponés vos. Ante la duda, bajá la confianza.
 
 Recommendation:
@@ -65,17 +71,19 @@ Recommendation:
 
 # Reglas
 
-1. Exactamente ${GRAPH_LIMITS.maxPerLane} recomendaciones por carril (${GRAPH_LIMITS.maxPerLane * 3} en total), todas libros distintos.
-   - affinity: lo más cercano a lo que ya le mueve.
-   - alternative: comparte el espíritu pero entra por otra puerta (otra época, otro país, otro género).
-   - beyond: una conexión que no esperaba, lejana en tiempo, lengua o forma, pero justificada por el recorrido. Es el carril más importante: tiene que sorprender y convencer.
+1. Exactamente ${GRAPH_LIMITS.maxPerLane} recomendaciones por carril (${GRAPH_LIMITS.maxPerLane * 3} en total). Las ${GRAPH_LIMITS.maxPerLane * 3} son libros distintos y de autores distintos: no repitas autor entre recomendaciones.
+   - affinity: lo más cercano a las pistas (mismo movimiento, misma época o la misma búsqueda).
+   - alternative: comparte el espíritu pero entra por otra puerta: otra época, otro país, otra lengua u otro género.
+   - beyond: una conexión que no esperaba, lejana en tiempo, lengua o forma, pero justificada por el recorrido. Es el carril más importante: tiene que sorprender y convencer. Evitá los clásicos obvios que cualquiera sugeriría.
 2. Nunca recomiendes un libro que el usuario dio como pista.
-3. Entre ${GRAPH_LIMITS.maxPerLane * 3 + 2} y ${GRAPH_LIMITS.maxNodes} nodos en total. Es un mapa acotado: preferí nodos intermedios que sirvan a varios recorridos.
+3. Entre ${GRAPH_LIMITS.maxPerLane * 3 + 2} y ${GRAPH_LIMITS.maxNodes} nodos en total. Es un mapa acotado: preferí nodos intermedios que sirvan a varios recorridos. No crees un nodo person para el autor de un libro que ya está en el mapa (el autor va en "subtitle"); un nodo person sirve solo si conecta con algo más que con su propio libro.
 4. Las pistas que son libro, autor o movimiento se vuelven nodos con "isClue": true. Las frases, estilos, sensaciones e ideas pueden volverse un nodo "concept" con "isClue": true si sirven de punto de partida. Tiene que haber al menos un nodo pista.
-5. Cada "path" empieza en un nodo con "isClue": true, termina en el libro recomendado, tiene como máximo ${GRAPH_LIMITS.maxHops} saltos y entre cada par de paradas consecutivas existe una arista (en cualquier dirección).
-6. Solo libros reales y publicados, con su autor y año correctos. Usá el título con el que se conoce en español si existe una traducción publicada; si no, el original.
-7. No inventes hechos, citas ni anécdotas. Las frases entre comillas solo si son textuales y conocidas (títulos, epígrafes, versos célebres); si no estás seguro, no uses shared_phrase.
-8. Escribí en español neutro, claro y concreto. Nada de generalidades ("una obra maestra", "un clásico imprescindible"): cada explicación dice qué conecta a esos dos nodos.
+5. Cada "path" empieza en un nodo con "isClue": true, termina en el libro recomendado y tiene como máximo ${GRAPH_LIMITS.maxHops} saltos. Por cada par de paradas consecutivas del path TIENE que existir una arista en "edges" entre esos dos nodos (en cualquier dirección). Escribí primero esas aristas y después el path.
+6. Solo libros reales y publicados, con su autor y año de primera publicación correctos. "label" es el título con el que se conoce en español si hay traducción publicada; en ese caso completá "originalTitle".
+7. No inventes hechos, citas ni anécdotas. Las frases entre comillas solo si son textuales y conocidas (títulos, epígrafes, versos célebres); si no estás seguro, no uses shared_phrase. Si una conexión es una lectura tuya, usá "interpretive".
+8. Escribí en español neutro, claro y concreto. "explanation" en 1 a 3 oraciones (≤ 350 caracteres); "summary" ≤ 100. Nada de generalidades ("una obra maestra", "un clásico imprescindible"): cada explicación dice qué conecta a esos dos nodos.
+
+Antes de responder, revisá: ${GRAPH_LIMITS.maxPerLane * 3} recomendaciones de ${GRAPH_LIMITS.maxPerLane * 3} autores distintos, cada par consecutivo de cada path tiene su arista, cada influence va de lo anterior a lo posterior.
 
 # Ejemplo de formato (no lo copies: es solo la forma)
 

@@ -50,9 +50,9 @@ La sesión se refresca en `src/proxy.ts` (en Next 16 `proxy` reemplaza a `middle
 Con DeepSeek, cada búsqueda:
 
 1. Pide el grafo a `deepseek-flash` en modo JSON (`prompt.ts`). El mensaje de sistema es fijo para aprovechar el cache de prompts de DeepSeek; las pistas van en el mensaje del usuario.
-2. Repara lo mecánico (largos, ids, aristas sueltas) en `normalize.ts` y valida con `ConnectionGraphSchema`.
-3. Si no cumple el contrato, reintenta mostrándole al modelo los errores concretos (hasta 3 intentos en total).
-4. Verifica cada libro contra Google Books y, si no aparece, Open Library (`src/lib/catalog/books.ts`): marca `verified`, agrega portada e ids. Una recomendación no verificada se descarta si su carril tiene otra verificada; si no, se muestra con la etiqueta «Sin verificar en catálogos».
+2. Repara lo mecánico en `normalize.ts` (largos, ids, nodos repetidos, aristas sueltas, influencias escritas al revés) y valida con `ConnectionGraphSchema`.
+3. Si lo único que falla son algunas recomendaciones o aristas, las descarta sin pagar otro intento, siempre que cada carril conserve al menos 2 (`salvage`). Si no, reintenta mostrándole al modelo los errores concretos (hasta 3 intentos en total).
+4. Verifica cada libro contra Google Books y, si no aparece, Open Library (`src/lib/catalog/books.ts`), probando el título en español y el original (`originalTitle`): marca `verified`, agrega portada e ids. Conviene configurar `GOOGLE_BOOKS_API_KEY`: sin clave, Google comparte una cuota que se agota rápido. Una recomendación no verificada se descarta si su carril tiene otra verificada; si no, se muestra con la etiqueta «Sin verificar en catálogos».
 
 `/api/recommend` limita a 8 búsquedas por IP cada 10 minutos y cachea en memoria las búsquedas repetidas por 24 h. Ambos son por instancia: alcanzan para empezar, no para producción con tráfico.
 
