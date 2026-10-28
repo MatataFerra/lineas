@@ -43,3 +43,6 @@ next-env.d.ts
 
 # supabase
 /supabase/.temp/*
+
+# corridas de prueba del motor
+.engine-runs/

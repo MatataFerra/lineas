@@ -168,16 +168,23 @@ function LaneCard({
       <div key={node.id} className="animate-fade flex flex-1 flex-col">
         <div className="mt-4.5 flex gap-4 md:flex-col md:gap-0">
           <div className="md:hidden">
-            <BookCover id={node.id} title={node.label} author={author} size="md" />
+            <BookCover id={node.id} title={node.label} author={author} size="md" coverUrl={node.book?.coverUrl} />
           </div>
           <div className="mx-auto mt-5.5 mb-5 hidden md:block">
-            <BookCover id={node.id} title={node.label} author={author} size="lg" />
+            <BookCover id={node.id} title={node.label} author={author} size="lg" coverUrl={node.book?.coverUrl} />
           </div>
           <div className="min-w-0 pt-1 md:pt-0">
             <h2 className="font-serif text-[22px] leading-[1.15] md:text-[23px]">{node.label}</h2>
             <p className="mt-1 text-[13px] text-muted">
               {author} · {node.era.label}
             </p>
+            {node.book && !node.book.verified && (
+              <p
+                className="mt-1.5 text-[11px] text-muted"
+                title="No lo encontramos en Google Books ni en Open Library. Puede ser una edición poco difundida, o un error del modelo.">
+                Sin verificar en catálogos
+              </p>
+            )}
           </div>
         </div>
         <p className="mt-3.5 text-sm leading-relaxed md:text-[13px] md:leading-normal">
@@ -226,6 +233,9 @@ function ResultsSkeleton() {
     <div aria-live="polite" className="mt-9">
       <p className="animate-soft-pulse text-[13px] text-muted">
         Buscando conexiones entre tus pistas…
+      </p>
+      <p className="mt-1 text-xs text-muted">
+        Armar el mapa y verificar cada libro puede llevar unos segundos.
       </p>
       <div className="mt-4 grid gap-6 md:grid-cols-3">
         {[0, 1, 2].map((i) => (

@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           author: string | null
           book_id: string
+          cover_url: string | null
           created_at: string
           status: Database["public"]["Enums"]["library_status"]
           title: string
@@ -27,6 +28,7 @@ export type Database = {
         Insert: {
           author?: string | null
           book_id: string
+          cover_url?: string | null
           created_at?: string
           status: Database["public"]["Enums"]["library_status"]
           title: string
@@ -36,6 +38,7 @@ export type Database = {
         Update: {
           author?: string | null
           book_id?: string
+          cover_url?: string | null
           created_at?: string
           status?: Database["public"]["Enums"]["library_status"]
           title?: string

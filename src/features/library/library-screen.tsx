@@ -73,7 +73,7 @@ export function LibraryScreen() {
         <ul className="mt-8 grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {entries.map((entry) => (
             <li key={entry.id} className="flex flex-col">
-              <BookCover id={entry.id} title={entry.title} author={entry.author ?? undefined} size="md" />
+              <BookCover id={entry.id} title={entry.title} author={entry.author ?? undefined} size="md" coverUrl={entry.coverUrl} />
               <span className="mt-3 font-serif text-base leading-tight">{entry.title}</span>
               <span className="mt-1 text-xs text-muted">{[entry.author, entry.yearLabel].filter(Boolean).join(" · ")}</span>
               <span className="mt-1.5 text-[11px] text-muted">{entry.statuses.read ? "Leído" : "Por leer"}</span>

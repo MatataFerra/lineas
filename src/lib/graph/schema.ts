@@ -228,6 +228,8 @@ export const ConnectionGraphSchema = z
         ctx.addIssue({ code: "custom", path: ["recommendations", i, "nodeId"], message: `Nodo inexistente: ${rec.nodeId}` });
       } else if (target.kind !== "book") {
         ctx.addIssue({ code: "custom", path: ["recommendations", i, "nodeId"], message: "Solo se recomiendan libros" });
+      } else if (target.isClue) {
+        ctx.addIssue({ code: "custom", path: ["recommendations", i, "nodeId"], message: `${rec.nodeId} es una pista del usuario: no se puede recomendar` });
       }
       const [first] = rec.path;
       const last = rec.path[rec.path.length - 1];

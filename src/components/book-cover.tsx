@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 const PALETTE: { bg: string; ink: string }[] = [
   { bg: "#b8432e", ink: "#f4f0e8" },
   { bg: "#2f4a5c", ink: "#f4f0e8" },
@@ -18,24 +20,48 @@ export function coverColors(id: string) {
 }
 
 const SIZES = {
-  xs: { box: "h-[18px] w-3 rounded-[1px]", title: "hidden", author: "hidden" },
-  sm: { box: "h-[58px] w-10 rounded-[2px] p-1.5", title: "text-[15px]", author: "hidden" },
-  md: { box: "h-[170px] w-[116px] rounded-[3px] px-[11px] py-3.5", title: "text-[17px]", author: "text-[9px]" },
-  lg: { box: "h-[220px] w-[150px] rounded-[3px] px-3.5 py-[18px]", title: "text-[22px]", author: "text-[10px]" },
+  xs: { box: "h-[18px] w-3 rounded-[1px]", pad: "", title: "hidden", author: "hidden" },
+  sm: { box: "h-[58px] w-10 rounded-[2px]", pad: "p-1.5", title: "text-[15px]", author: "hidden" },
+  md: { box: "h-[170px] w-[116px] rounded-[3px]", pad: "px-[11px] py-3.5", title: "text-[17px]", author: "text-[9px]" },
+  lg: { box: "h-[220px] w-[150px] rounded-[3px]", pad: "px-3.5 py-[18px]", title: "text-[22px]", author: "text-[10px]" },
 };
 
+const IMAGE_SIZES = { xs: "12px", sm: "40px", md: "116px", lg: "150px" };
+
 /**
- * Portada tipográfica provisoria. Cuando el libro venga verificado de un
- * catálogo con `coverUrl`, se reemplaza por la imagen real.
+ * Portada del libro: la imagen real si el catálogo la tiene (`coverUrl`), si no
+ * una portada tipográfica con un color estable por libro.
  */
-export function BookCover({ id, title, author, size }: { id: string; title: string; author?: string; size: keyof typeof SIZES }) {
+export function BookCover({
+  id,
+  title,
+  author,
+  size,
+  coverUrl,
+}: {
+  id: string;
+  title: string;
+  author?: string;
+  size: keyof typeof SIZES;
+  coverUrl?: string | null;
+}) {
   const colors = coverColors(id);
   const s = SIZES[size];
   const initialOnly = size === "sm";
+  if (coverUrl) {
+    return (
+      <span
+        aria-hidden="true"
+        className={`relative block shrink-0 overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,0.12),0_10px_20px_rgba(0,0,0,0.08)] ${s.box}`}
+        style={{ background: colors.bg }}>
+        <Image src={coverUrl} alt="" fill sizes={IMAGE_SIZES[size]} className="object-cover" />
+      </span>
+    );
+  }
   return (
     <span
       aria-hidden="true"
-      className={`box-border flex shrink-0 flex-col shadow-[0_1px_2px_rgba(0,0,0,0.12),0_10px_20px_rgba(0,0,0,0.08)] ${s.box} ${initialOnly ? "justify-end" : "justify-between"}`}
+      className={`box-border flex shrink-0 flex-col shadow-[0_1px_2px_rgba(0,0,0,0.12),0_10px_20px_rgba(0,0,0,0.08)] ${s.box} ${s.pad} ${initialOnly ? "justify-end" : "justify-between"}`}
       style={{ background: colors.bg, color: colors.ink }}
     >
       <span className={`font-serif leading-[1.05] ${s.title}`}>{initialOnly ? title.charAt(0) : title}</span>

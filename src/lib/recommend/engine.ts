@@ -1,23 +1,67 @@
+import { verifyGraphBooks } from "@/lib/catalog/books";
 import { mockGraphFor } from "@/lib/graph/mock";
 import { ConnectionGraphSchema, type Clue, type ConnectionGraph } from "@/lib/graph/schema";
+import { generateGraphWithLlm } from "./llm-engine";
 
 /**
  * Motor de recomendación. Corre solo en el servidor (lo llama /api/recommend).
  *
- * Hoy devuelve el grafo de ejemplo. El siguiente paso es un motor "llm" que:
- *   1. pide al modelo un ConnectionGraph con salida estructurada (el JSON Schema
- *      sale de ConnectionGraphSchema con z.toJSONSchema),
- *   2. valida la respuesta con ConnectionGraphSchema (y reintenta con los errores),
- *   3. verifica cada libro contra Google Books / Open Library y completa `book`.
+ * - "deepseek": pide el grafo al modelo, lo valida (con reintentos) y verifica
+ *   cada libro contra Google Books / Open Library.
+ * - "mock": el grafo de ejemplo, para trabajar en la UI sin gastar tokens.
+ *
+ * Por defecto usa DeepSeek si hay DEEPSEEK_API_KEY; LINEAS_ENGINE lo fuerza.
  */
-export type EngineName = "mock";
+export type EngineName = "mock" | "deepseek";
 
 export function currentEngine(): EngineName {
-  return "mock";
+  const forced = process.env.LINEAS_ENGINE;
+  if (forced === "mock" || forced === "deepseek") return forced;
+  return process.env.DEEPSEEK_API_KEY ? "deepseek" : "mock";
 }
 
-export async function recommend(clues: Clue[]): Promise<ConnectionGraph> {
-  // Simula la latencia de un modelo para poder diseñar el estado de carga.
-  await new Promise((resolve) => setTimeout(resolve, 700));
-  return ConnectionGraphSchema.parse(mockGraphFor(clues));
+/* Cache en memoria por instancia: la misma búsqueda no se paga dos veces seguidas. */
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const CACHE_MAX = 200;
+const cache = new Map<string, { graph: ConnectionGraph; at: number }>();
+
+export function cacheKey(clues: Clue[]): string {
+  return JSON.stringify(
+    clues.map((c) => [c.kind, c.label.trim().toLowerCase()]).sort((a, b) => (a.join() < b.join() ? -1 : 1)),
+  );
+}
+
+export async function recommend(clues: Clue[]): Promise<{ graph: ConnectionGraph; engine: EngineName; cached: boolean }> {
+  const engine = currentEngine();
+
+  if (engine === "mock") {
+    // Simula la latencia de un modelo para poder diseñar el estado de carga.
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    return { graph: ConnectionGraphSchema.parse(mockGraphFor(clues)), engine, cached: false };
+  }
+
+  const key = cacheKey(clues);
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < CACHE_TTL_MS) {
+    return { graph: { ...hit.graph, clues }, engine, cached: true };
+  }
+
+  const generated = await generateGraphWithLlm(clues, {
+    apiKey: process.env.DEEPSEEK_API_KEY ?? "",
+    model: process.env.DEEPSEEK_MODEL || "deepseek-flash",
+    reasoningEffort: parseEffort(process.env.DEEPSEEK_REASONING),
+    log: (event) => {
+      if (event.type === "invalid") console.warn(`[recommend] intento ${event.attempt} inválido:\n${event.reason}`);
+      if (event.type === "success") console.info(`[recommend] ok en intento ${event.attempt}`, JSON.stringify(event.usage));
+    },
+  });
+  const graph = await verifyGraphBooks(generated, { googleBooksKey: process.env.GOOGLE_BOOKS_API_KEY });
+
+  cache.set(key, { graph, at: Date.now() });
+  if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value!);
+  return { graph, engine, cached: false };
+}
+
+function parseEffort(value: string | undefined): "none" | "low" | "high" | "max" {
+  return value === "low" || value === "high" || value === "max" ? value : "none";
 }

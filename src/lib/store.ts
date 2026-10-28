@@ -3,7 +3,9 @@
 import { create } from "zustand";
 import { ConnectionGraphSchema, type Clue, type ClueKind, type ConnectionGraph, type GraphNode } from "@/lib/graph/schema";
 import { getBrowserSupabase } from "@/lib/supabase/client";
-import type { Json, LibraryStatus } from "@/lib/supabase/database.types";
+import type { Enums, Json } from "@/lib/supabase/database.types";
+
+export type LibraryStatus = Enums<"library_status">;
 
 type Status = "idle" | "loading" | "ready" | "error";
 
@@ -18,10 +20,17 @@ export interface BookSnapshot {
   title: string;
   author: string | null;
   yearLabel: string | null;
+  coverUrl: string | null;
 }
 
 export function bookSnapshot(node: GraphNode): BookSnapshot {
-  return { id: node.id, title: node.label, author: node.book?.author ?? node.subtitle ?? null, yearLabel: node.era.label };
+  return {
+    id: node.id,
+    title: node.label,
+    author: node.book?.author ?? node.subtitle ?? null,
+    yearLabel: node.era.label,
+    coverUrl: node.book?.coverUrl ?? null,
+  };
 }
 
 export interface LibraryEntry extends BookSnapshot {
@@ -154,7 +163,7 @@ export const useLineas = create<LineasState>()((set, get) => ({
     if (!user || !supabase) return;
 
     const { error } = on
-      ? await supabase.from("library_items").insert({ book_id: book.id, status, title: book.title, author: book.author, year_label: book.yearLabel })
+      ? await supabase.from("library_items").insert({ book_id: book.id, status, title: book.title, author: book.author, year_label: book.yearLabel, cover_url: book.coverUrl })
       : await supabase.from("library_items").delete().match({ book_id: book.id, status });
 
     if (error) {
@@ -184,6 +193,7 @@ export const useLineas = create<LineasState>()((set, get) => ({
         title: entry.title,
         author: entry.author,
         year_label: entry.yearLabel,
+        cover_url: entry.coverUrl,
       })),
     );
     if (pending.length) {
@@ -193,7 +203,7 @@ export const useLineas = create<LineasState>()((set, get) => ({
 
     const { data, error } = await supabase
       .from("library_items")
-      .select("book_id, status, title, author, year_label, created_at")
+      .select("book_id, status, title, author, year_label, cover_url, created_at")
       .order("created_at", { ascending: false });
     if (error) {
       console.error("[library] load", error);
@@ -203,7 +213,7 @@ export const useLineas = create<LineasState>()((set, get) => ({
 
     let library: Record<string, LibraryEntry> = {};
     for (const row of [...data].reverse()) {
-      library = withStatus(library, { id: row.book_id, title: row.title, author: row.author, yearLabel: row.year_label }, row.status, true, row.created_at);
+      library = withStatus(library, { id: row.book_id, title: row.title, author: row.author, yearLabel: row.year_label, coverUrl: row.cover_url }, row.status, true, row.created_at);
     }
     set({ library, libraryError: null });
   },
