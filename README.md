@@ -6,7 +6,7 @@ Líneas recomienda libros a partir de **pistas**: un libro, un autor, una frase,
 
 ## Estado
 
-Prototipo funcional. El flujo completo (inicio → pistas → resultados → conexiones) funciona en desktop y mobile. Con `DEEPSEEK_API_KEY` las recomendaciones las arma DeepSeek y cada libro se verifica contra Google Books / Open Library; sin clave se usa un grafo de ejemplo (`src/lib/graph/mock.ts`).
+Prototipo funcional. El flujo completo (inicio → pistas → resultados → conexiones) funciona en desktop y mobile. Con `OPENROUTER_API_KEY` (o `DEEPSEEK_API_KEY`) las recomendaciones las arma un modelo y cada libro se verifica contra Google Books / Open Library; sin clave se usa un grafo de ejemplo (`src/lib/graph/mock.ts`).
 
 Con Supabase configurado hay login por enlace mágico, biblioteca persistida (guardados / leídos) e historial de búsquedas. Sin variables de entorno la app funciona igual, en modo local.
 
@@ -28,6 +28,7 @@ pnpm lint
 pnpm typecheck
 pnpm build
 pnpm engine:try "book:Rayuela" "feeling:Nostalgia"   # prueba el motor real sin levantar la app
+pnpm engine:compare --models a/modelo,b/modelo "book:Rayuela"   # misma búsqueda en varios modelos
 ```
 
 ## Supabase
@@ -45,11 +46,19 @@ La sesión se refresca en `src/proxy.ts` (en Next 16 `proxy` reemplaza a `middle
 
 ## Motor de recomendación
 
-`src/lib/recommend/engine.ts` elige el motor: DeepSeek si hay `DEEPSEEK_API_KEY` (o `LINEAS_ENGINE=deepseek`), si no el mock.
+`src/lib/recommend/config.ts` elige el motor según las variables de entorno:
 
-Con DeepSeek, cada búsqueda:
+- **OpenRouter** (`OPENROUTER_API_KEY`): una clave para muchos modelos. `LLM_MODELS` es una lista: el primero es el preferido y el resto son respaldos si falla. Cada pedido va al proveedor más rápido de ese modelo (`provider.sort: "throughput"`). Por defecto `moonshotai/kimi-k2.6`.
+- **DeepSeek** (`DEEPSEEK_API_KEY`): la API oficial, `deepseek-flash` por defecto.
+- **Mock**: sin claves, o con `LINEAS_ENGINE=mock`.
 
-1. Pide el grafo a `deepseek-flash` en modo JSON (`prompt.ts`). El mensaje de sistema es fijo para aprovechar el cache de prompts de DeepSeek; las pistas van en el mensaje del usuario.
+`LLM_REASONING` (none/low/high/max) activa el razonamiento: los mapas salen mejor armados pero mucho más lentos. `LLM_JSON_SCHEMA=1` pide a OpenRouter salida con JSON Schema (`output-schema.ts`) y lo manda solo a proveedores que lo soportan.
+
+Para elegir modelo con datos: `pnpm engine:compare --models a,b,c "pista:…"` corre la misma búsqueda en paralelo y compara tiempo, tokens, costo y forma del mapa (recorridos de 2 saltos, aristas de historia, % de interpretaciones), con `src/lib/recommend/quality.ts`.
+
+Con un modelo real, cada búsqueda:
+
+1. Pide el grafo en modo JSON (`prompt.ts`, cliente en `llm-client.ts`). El mensaje de sistema es fijo para aprovechar el cache de prompts de los proveedores; las pistas van en el mensaje del usuario.
 2. Repara lo mecánico en `normalize.ts` (largos, ids, nodos repetidos, aristas sueltas, influencias escritas al revés) y valida con `ConnectionGraphSchema`.
 3. Si lo único que falla son algunas recomendaciones o aristas, las descarta sin pagar otro intento, siempre que cada carril conserve al menos 2 (`salvage`). Si no, reintenta mostrándole al modelo los errores concretos (hasta 3 intentos en total).
 4. Verifica cada libro contra Google Books y, si no aparece, Open Library (`src/lib/catalog/books.ts`), probando el título en español y el original (`originalTitle`): marca `verified`, agrega portada e ids. Conviene configurar `GOOGLE_BOOKS_API_KEY`: sin clave, Google comparte una cuota que se agota rápido. Una recomendación no verificada se descarta si su carril tiene otra verificada; si no, se muestra con la etiqueta «Sin verificar en catálogos».
@@ -77,7 +86,7 @@ src/
     graph/layout.ts          ubica nodos en una línea de tiempo sin superponerlos
     graph/queries.ts         índices, saltos, aristas de un recorrido
     graph/mock.ts            grafo de ejemplo (validado al cargar)
-    recommend/               motor: selección, cliente DeepSeek, prompt, normalización, reintentos
+    recommend/               motor: configuración, cliente OpenRouter/DeepSeek, prompt, normalización, reintentos, calidad
     catalog/books.ts         verificación en Google Books / Open Library
     supabase/                clientes de navegador y servidor, tipos de la base
     store.ts                 estado de la sesión (pistas, grafo, usuario, biblioteca)

@@ -1,10 +1,13 @@
 import { z } from "zod";
 import { ConnectionGraphSchema, type Clue, type ConnectionGraph } from "@/lib/graph/schema";
-import { chatJson, DeepSeekError, type ChatMessage, type DeepSeekOptions, type DeepSeekUsage } from "./deepseek";
+import { chatJson, LlmError, type ChatMessage, type LlmConfig, type LlmUsage } from "./llm-client";
 import { normalizeRawGraph } from "./normalize";
 import { buildRepairPrompt, buildUserPrompt, SYSTEM_PROMPT } from "./prompt";
 
-export interface LlmEngineOptions extends DeepSeekOptions {
+export interface LlmEngineOptions extends Partial<Omit<LlmConfig, "apiKey">> {
+  apiKey: string;
+  /** Atajo para un solo modelo (equivale a models: [model]). */
+  model?: string;
   /** Intentos totales, contando el primero. */
   maxAttempts?: number;
   log?: (event: LlmEvent) => void;
@@ -15,7 +18,7 @@ export type LlmEvent =
   | { type: "invalid"; attempt: number; reason: string }
   /** Se aceptó el grafo descartando recomendaciones o aristas que no cumplían. */
   | { type: "salvaged"; attempt: number; droppedRecommendations: string[]; droppedEdges: string[] }
-  | { type: "success"; attempt: number; usage: DeepSeekUsage[] };
+  | { type: "success"; attempt: number; usage: LlmUsage[]; model: string };
 
 export class EngineError extends Error {
   constructor(
@@ -33,12 +36,18 @@ export class EngineError extends Error {
  * por ConnectionGraphSchema.
  */
 export async function generateGraphWithLlm(clues: Clue[], options: LlmEngineOptions): Promise<ConnectionGraph> {
-  const { maxAttempts = 3, log = () => {}, ...deepseek } = options;
+  const { maxAttempts = 3, log = () => {}, model, ...rest } = options;
+  const config: LlmConfig = {
+    provider: "deepseek",
+    ...rest,
+    models: rest.models?.length ? rest.models : [model ?? "deepseek-flash"],
+  };
+  let answeredBy = config.models[0];
   const messages: ChatMessage[] = [
     { role: "system", content: SYSTEM_PROMPT },
     { role: "user", content: buildUserPrompt(clues) },
   ];
-  const usage: DeepSeekUsage[] = [];
+  const usage: LlmUsage[] = [];
   let lastIssues: string | undefined;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -46,8 +55,9 @@ export async function generateGraphWithLlm(clues: Clue[], options: LlmEngineOpti
 
     let content: string;
     try {
-      const result = await chatJson(messages, deepseek);
+      const result = await chatJson(messages, config);
       content = result.content;
+      answeredBy = result.model;
       if (result.usage) usage.push(result.usage);
       if (result.finishReason === "length") {
         lastIssues = "La respuesta se cortó por largo (max_tokens).";
@@ -55,7 +65,7 @@ export async function generateGraphWithLlm(clues: Clue[], options: LlmEngineOpti
         continue;
       }
     } catch (error) {
-      if (error instanceof DeepSeekError && error.retryable && attempt < maxAttempts) {
+      if (error instanceof LlmError && error.retryable && attempt < maxAttempts) {
         log({ type: "invalid", attempt, reason: error.message });
         await sleep(400 * attempt);
         continue;
@@ -76,7 +86,7 @@ export async function generateGraphWithLlm(clues: Clue[], options: LlmEngineOpti
     const candidate = normalizeRawGraph(raw, clues);
     const parsed = ConnectionGraphSchema.safeParse(candidate);
     if (parsed.success) {
-      log({ type: "success", attempt, usage });
+      log({ type: "success", attempt, usage, model: answeredBy });
       return parsed.data;
     }
 
@@ -85,7 +95,7 @@ export async function generateGraphWithLlm(clues: Clue[], options: LlmEngineOpti
     const salvaged = salvage(candidate, attempt === maxAttempts ? 1 : 2);
     if (salvaged) {
       log({ type: "salvaged", attempt, droppedRecommendations: salvaged.droppedRecommendations, droppedEdges: salvaged.droppedEdges });
-      log({ type: "success", attempt, usage });
+      log({ type: "success", attempt, usage, model: answeredBy });
       return salvaged.graph;
     }
 

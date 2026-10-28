@@ -4,23 +4,22 @@ import "server-only";
 import { verifyGraphBooks } from "@/lib/catalog/books";
 import { mockGraphFor } from "@/lib/graph/mock";
 import { ConnectionGraphSchema, type Clue, type ConnectionGraph } from "@/lib/graph/schema";
+import { engineFromEnv, llmConfigFromEnv, type EngineName } from "./config";
 import { generateGraphWithLlm } from "./llm-engine";
 
 /**
  * Motor de recomendación. Corre solo en el servidor (lo llama /api/recommend).
  *
- * - "deepseek": pide el grafo al modelo, lo valida (con reintentos) y verifica
- *   cada libro contra Google Books / Open Library.
+ * - "openrouter" / "deepseek": pide el grafo al modelo, lo valida (con
+ *   reintentos) y verifica cada libro contra Google Books / Open Library.
  * - "mock": el grafo de ejemplo, para trabajar en la UI sin gastar tokens.
  *
- * Por defecto usa DeepSeek si hay DEEPSEEK_API_KEY; LINEAS_ENGINE lo fuerza.
+ * Qué motor y qué modelos se usan lo deciden las variables de entorno (config.ts).
  */
-export type EngineName = "mock" | "deepseek";
+export type { EngineName } from "./config";
 
 export function currentEngine(): EngineName {
-  const forced = process.env.LINEAS_ENGINE;
-  if (forced === "mock" || forced === "deepseek") return forced;
-  return process.env.DEEPSEEK_API_KEY ? "deepseek" : "mock";
+  return engineFromEnv();
 }
 
 /* Cache en memoria por instancia: la misma búsqueda no se paga dos veces seguidas. */
@@ -50,12 +49,10 @@ export async function recommend(clues: Clue[]): Promise<{ graph: ConnectionGraph
   }
 
   const generated = await generateGraphWithLlm(clues, {
-    apiKey: process.env.DEEPSEEK_API_KEY ?? "",
-    model: process.env.DEEPSEEK_MODEL || "deepseek-flash",
-    reasoningEffort: parseEffort(process.env.DEEPSEEK_REASONING),
+    ...llmConfigFromEnv(),
     log: (event) => {
       if (event.type === "invalid") console.warn(`[recommend] intento ${event.attempt} inválido:\n${event.reason}`);
-      if (event.type === "success") console.info(`[recommend] ok en intento ${event.attempt}`, JSON.stringify(event.usage));
+      if (event.type === "success") console.info(`[recommend] ok con ${event.model} en intento ${event.attempt}`, JSON.stringify(event.usage));
     },
   });
   const graph = await verifyGraphBooks(generated, { googleBooksKey: process.env.GOOGLE_BOOKS_API_KEY });
@@ -63,8 +60,4 @@ export async function recommend(clues: Clue[]): Promise<{ graph: ConnectionGraph
   cache.set(key, { graph, at: Date.now() });
   if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value!);
   return { graph, engine, cached: false };
-}
-
-function parseEffort(value: string | undefined): "none" | "low" | "high" | "max" {
-  return value === "low" || value === "high" || value === "max" ? value : "none";
 }
