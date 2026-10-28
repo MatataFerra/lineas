@@ -114,6 +114,8 @@ export const EdgeTypeSchema = z.enum([
   "belongs_to",
   /** Mismo autor. */
   "same_author",
+  /** Una persona escribió este libro (persona → libro). Para pistas de tipo autor. */
+  "authored",
 ]);
 export type EdgeType = z.infer<typeof EdgeTypeSchema>;
 
@@ -224,6 +226,9 @@ export const ConnectionGraphSchema = z
       if (source && target) {
         if (e.type === "same_author" && (source.kind !== "book" || target.kind !== "book")) {
           ctx.addIssue({ code: "custom", path: ["edges", i, "type"], message: `${e.id}: same_author une dos libros, no ${source.kind} y ${target.kind}` });
+        }
+        if (e.type === "authored" && (source.kind !== "person" || target.kind !== "book")) {
+          ctx.addIssue({ code: "custom", path: ["edges", i, "type"], message: `${e.id}: authored va de una persona a un libro suyo` });
         }
         if (e.type === "belongs_to" && target.kind !== "movement" && target.kind !== "concept") {
           ctx.addIssue({ code: "custom", path: ["edges", i, "type"], message: `${e.id}: el destino de belongs_to tiene que ser un movimiento o una idea` });

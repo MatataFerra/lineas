@@ -248,15 +248,44 @@ describe("createRateLimiter", () => {
 });
 
 describe("corrida real (On the Road · Generación Beat · La libertad)", () => {
-  it("da vuelta la influencia Céline → Kerouac y descarta los same_author mal usados", async () => {
+  it("da vuelta la influencia Céline → Kerouac y convierte los same_author persona→libro en authored", async () => {
     const { readFileSync } = await import("node:fs");
     const raw = JSON.parse(readFileSync(new URL("./__fixtures__/run-on-the-road.json", import.meta.url), "utf8"));
     const normalized = normalizeRawGraph(raw, raw.clues) as { edges: { id: string; source: string; target: string }[] };
     expect(normalized.edges.find((e) => e.id === "e-road-celine")).toMatchObject({ source: "viaje-al-fin-de-la-noche", target: "on-the-road" });
 
     const { salvage } = await import("./llm-engine");
+    expect(normalized.edges.find((e) => e.id === "e-kerouac-road")).toMatchObject({ type: "authored", source: "jack-kerouac" });
     const rescued = salvage(normalized, 1);
-    expect(rescued?.droppedEdges).toEqual(["e-kerouac-road", "e-ginsberg-howl"]);
+    expect(rescued?.droppedEdges).toEqual([]);
     expect(rescued?.graph.recommendations).toHaveLength(5);
+  });
+});
+
+describe("corrida real (Clarice Lispector · Desarraigo · tiempo detenido)", () => {
+  it("convierte persona→libro en authored y libro→idea en tema en común", () => {
+    const raw = JSON.parse(modelOutput((g) => {
+      const nodes = g.nodes as Record<string, unknown>[];
+      nodes.push({ id: "jack-kerouac", kind: "person", label: "Jack Kerouac", subtitle: "Escritor", era: { from: 1922, to: 1969, label: "1922–1969", pivot: 1957 }, isClue: false });
+      nodes.push({ id: "libertad", kind: "concept", label: "La libertad", subtitle: "Idea", era: { from: 1940, to: 1970, label: "posguerra" }, isClue: false });
+      const edges = g.edges as Record<string, unknown>[];
+      edges.push({ id: "kerouac-road", source: "on-the-road", target: "jack-kerouac", type: "same_author", confidence: "documented", summary: "s", explanation: "e" });
+      edges.push({ id: "road-libertad", source: "on-the-road", target: "libertad", type: "belongs_to", confidence: "scholarly", summary: "s", explanation: "e" });
+    }));
+    const out = normalizeRawGraph(raw, CLUES) as { edges: { id: string; type: string; source: string; target: string }[] };
+    expect(out.edges.find((e) => e.id === "kerouac-road")).toMatchObject({ type: "authored", source: "jack-kerouac", target: "on-the-road" });
+    expect(out.edges.find((e) => e.id === "road-libertad")?.type).toBe("shared_theme");
+  });
+
+  it("recorta nodos sobrantes que no están en ningún recorrido en vez de reintentar", async () => {
+    const tooMany = modelOutput((g) => {
+      const nodes = g.nodes as Record<string, unknown>[];
+      for (let i = 0; i < 4; i++) nodes.push({ id: `extra-${i}`, kind: "person", label: `Extra ${i}`, subtitle: "x", era: { from: 1900, label: "1900" }, isClue: false });
+    });
+    const { fetch, calls } = fakeFetch(deepseekReply(tooMany));
+    const graph = await generateGraphWithLlm(CLUES, { ...base, fetch });
+    expect(calls).toHaveLength(1);
+    expect(graph.nodes.length).toBeLessThanOrEqual(16);
+    expect(graph.recommendations).toHaveLength(9);
   });
 });

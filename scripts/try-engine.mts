@@ -86,6 +86,12 @@ if (misses.some((m) => m.includes("google") && m.includes("http-"))) {
   console.log("  → Google Books respondió con error. Sin GOOGLE_BOOKS_API_KEY la cuota es compartida y se agota rápido.");
 }
 
+const hops = Object.groupBy(graph.recommendations, (r) => `${r.path.length - 1} ${r.path.length === 2 ? "salto" : "saltos"}`);
+const viaConcept = graph.recommendations.filter((r) => r.path.length === 2 && nodes.get(r.path[0])?.kind === "concept").length;
+const history = graph.edges.filter((e) => e.type === "influence" || e.type === "other_arts" || e.type === "shared_phrase").length;
+console.log(`\nRecorridos: ${Object.entries(hops).map(([k, v]) => `${k} ${v?.length}`).join(" · ")} · colgados directo de una idea: ${viaConcept}`);
+console.log(`Aristas de historia (influencia, otras artes, frase): ${history}${history < 4 ? "  ← pocas: el mapa es más temático que histórico" : ""}`);
+
 const byType = Object.groupBy(graph.edges, (e) => EDGE_META[e.type].label);
 const byConfidence = Object.groupBy(graph.edges, (e) => CONFIDENCE_META[e.confidence].label);
 console.log(`\nAristas por tipo: ${Object.entries(byType).map(([k, v]) => `${k} ${v?.length}`).join(" · ")}`);

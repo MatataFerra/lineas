@@ -1,4 +1,4 @@
-import type { Clue } from "@/lib/graph/schema";
+import { GRAPH_LIMITS, type Clue } from "@/lib/graph/schema";
 
 /**
  * Reparaciones deterministas sobre la salida cruda del modelo, antes de validar.
@@ -37,6 +37,7 @@ export function normalizeRawGraph(raw: unknown, clues: Clue[]): unknown {
 
   const nodeIds = new Set(nodes.map((n) => n.id));
   const yearById = new Map(nodes.map((n) => [n.id, representativeYear(n.era)]));
+  const kindById = new Map(nodes.map((n) => [n.id, String((n as Record<string, unknown>).kind)]));
   const mapId = (value: unknown) => (typeof value === "string" ? (idMap.get(value) ?? slug(value)) : value);
 
   const seenEdges = new Set<string>();
@@ -51,6 +52,7 @@ export function normalizeRawGraph(raw: unknown, clues: Clue[]): unknown {
       explanation: clip(String(edge.explanation ?? ""), 600),
       ...(typeof edge.quote === "string" ? { quote: clip(edge.quote, 200) } : {}),
     }))
+    .map((edge) => retype(edge, kindById))
     .map((edge) => {
       // Una influencia va de lo anterior a lo posterior. Si el modelo la escribió al revés
       // (la explicación suele estar bien, solo invirtió los extremos), la damos vuelta.
@@ -77,8 +79,59 @@ export function normalizeRawGraph(raw: unknown, clues: Clue[]): unknown {
       pathSummary: clip(String(rec.pathSummary ?? ""), 240),
     }));
 
+  const pruned = pruneNodes(nodes, edges, recommendations);
+
   // Las pistas son las del usuario, no las que el modelo dice que recibió.
-  return { version: 1, clues, nodes, edges, recommendations };
+  return { version: 1, clues, nodes: pruned.nodes, edges: pruned.edges, recommendations };
+}
+
+type LooseEdge = Record<string, unknown> & { id: string; source: unknown; target: unknown };
+
+/**
+ * Corrige tipos de arista mal elegidos cuando la intención es inequívoca:
+ * - persona ↔ libro marcado como same_author → authored (persona → libro).
+ * - libro → idea marcado como belongs_to → shared_theme: una novela no "pertenece"
+ *   al desarraigo, lo comparte.
+ * - una idea como origen de other_arts → shared_theme.
+ */
+function retype<E extends LooseEdge>(edge: E, kindById: Map<string, string>): E {
+  const sourceKind = kindById.get(String(edge.source));
+  const targetKind = kindById.get(String(edge.target));
+  const type = edge.type;
+  if (type === "same_author" || type === "authored") {
+    if (sourceKind === "person" && targetKind === "book") return { ...edge, type: "authored" };
+    if (sourceKind === "book" && targetKind === "person") return { ...edge, type: "authored", source: edge.target, target: edge.source };
+  }
+  if (type === "belongs_to" && (targetKind === "concept" || sourceKind === "concept")) return { ...edge, type: "shared_theme" };
+  if (type === "other_arts" && (sourceKind === "concept" || targetKind === "concept")) return { ...edge, type: "shared_theme" };
+  return edge;
+}
+
+/**
+ * Si el modelo se pasó del máximo de nodos, saca los que no están en ningún
+ * recorrido ni son pistas, empezando por los menos conectados. Así un mapa con
+ * 18 nodos no obliga a pagar otro intento.
+ */
+function pruneNodes<N extends { id: string; isClue: boolean }, E extends LooseEdge>(
+  nodes: N[],
+  edges: E[],
+  recommendations: { nodeId?: unknown; path?: unknown[] }[],
+): { nodes: N[]; edges: E[] } {
+  if (nodes.length <= GRAPH_LIMITS.maxNodes) return { nodes, edges };
+  const protectedIds = new Set<string>(nodes.filter((n) => n.isClue).map((n) => n.id));
+  for (const rec of recommendations) {
+    if (typeof rec.nodeId === "string") protectedIds.add(rec.nodeId);
+    for (const id of rec.path ?? []) if (typeof id === "string") protectedIds.add(id);
+  }
+  const degree = new Map<string, number>();
+  for (const e of edges) for (const end of [e.source, e.target]) degree.set(String(end), (degree.get(String(end)) ?? 0) + 1);
+
+  const removable = nodes.filter((n) => !protectedIds.has(n.id)).sort((a, b) => (degree.get(a.id) ?? 0) - (degree.get(b.id) ?? 0));
+  const removed = new Set(removable.slice(0, nodes.length - GRAPH_LIMITS.maxNodes).map((n) => n.id));
+  return {
+    nodes: nodes.filter((n) => !removed.has(n.id)),
+    edges: edges.filter((e) => !removed.has(String(e.source)) && !removed.has(String(e.target))),
+  };
 }
 
 function normalizeEra(era: unknown): unknown {

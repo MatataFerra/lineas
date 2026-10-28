@@ -15,9 +15,10 @@ export const EDGE_META: Record<EdgeType, { label: string; dash: string; width: n
   shared_theme: { label: "Tema en común", dash: "1 6", width: 2.2, arrow: false },
   belongs_to: { label: "Pertenece a", dash: "none", width: 1, arrow: true },
   same_author: { label: "Mismo autor", dash: "3 3", width: 1.4, arrow: true },
+  authored: { label: "Obra de", dash: "3 3", width: 1.4, arrow: true },
 };
 
-export const EDGE_ORDER: EdgeType[] = ["influence", "shared_phrase", "other_arts", "shared_theme", "belongs_to", "same_author"];
+export const EDGE_ORDER: EdgeType[] = ["influence", "shared_phrase", "other_arts", "shared_theme", "belongs_to", "same_author", "authored"];
 
 export const CONFIDENCE_META: Record<Confidence, { label: string; hint: string }> = {
   documented: { label: "Documentado", hint: "Hay registro: cartas, entrevistas, citas." },

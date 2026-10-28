@@ -1,0 +1,525 @@
+{
+  "version": 1,
+  "clues": [
+    {
+      "id": "c1",
+      "kind": "author",
+      "label": "Clarice Lispector"
+    },
+    {
+      "id": "c2",
+      "kind": "feeling",
+      "label": "Desarraigo"
+    },
+    {
+      "id": "c3",
+      "kind": "quote",
+      "label": "Quiero sentir que el tiempo se detiene"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "clarice-lispector",
+      "kind": "person",
+      "label": "Clarice Lispector",
+      "subtitle": "Escritora · Ucrania–Brasil",
+      "era": {
+        "from": 1920,
+        "to": 1977,
+        "label": "1920–1977",
+        "pivot": 1964
+      },
+      "isClue": true
+    },
+    {
+      "id": "desarraigo",
+      "kind": "concept",
+      "label": "El desarraigo",
+      "subtitle": "Idea · estar fuera de lugar",
+      "era": {
+        "from": 1930,
+        "to": 1980,
+        "label": "siglo XX"
+      },
+      "isClue": true
+    },
+    {
+      "id": "tiempo-detiene",
+      "kind": "concept",
+      "label": "El tiempo que se detiene",
+      "subtitle": "Idea · el instante suspendido",
+      "era": {
+        "from": 1900,
+        "to": 2000,
+        "label": "siglo XX"
+      },
+      "isClue": true
+    },
+    {
+      "id": "la-pasion-segun-gh",
+      "kind": "book",
+      "label": "La pasión según G.H.",
+      "subtitle": "Clarice Lispector",
+      "originalTitle": "A Paixão segundo G.H.",
+      "era": {
+        "from": 1964,
+        "label": "1964"
+      },
+      "isClue": false,
+      "book": {
+        "author": "Clarice Lispector",
+        "isbn": "9788476694077",
+        "openLibraryKey": "/works/OL1002138W",
+        "coverUrl": "https://covers.openlibrary.org/b/id/4141933-M.jpg",
+        "verified": true
+      }
+    },
+    {
+      "id": "la-hora-de-la-estrella",
+      "kind": "book",
+      "label": "La hora de la estrella",
+      "subtitle": "Clarice Lispector",
+      "originalTitle": "A Hora da Estrela",
+      "era": {
+        "from": 1977,
+        "label": "1977"
+      },
+      "isClue": false,
+      "book": {
+        "author": "Clarice Lispector",
+        "isbn": "9788526502093",
+        "openLibraryKey": "/works/OL1002120W",
+        "coverUrl": "https://covers.openlibrary.org/b/id/650866-M.jpg",
+        "verified": true
+      }
+    },
+    {
+      "id": "agua-viva",
+      "kind": "book",
+      "label": "Agua viva",
+      "subtitle": "Clarice Lispector",
+      "originalTitle": "Água Viva",
+      "era": {
+        "from": 1973,
+        "label": "1973"
+      },
+      "isClue": false,
+      "book": {
+        "author": "Clarice Lispector",
+        "isbn": "6555320214",
+        "openLibraryKey": "/works/OL1002156W",
+        "coverUrl": "https://covers.openlibrary.org/b/id/7433819-M.jpg",
+        "verified": true
+      }
+    },
+    {
+      "id": "el-extranjero",
+      "kind": "book",
+      "label": "El extranjero",
+      "subtitle": "Albert Camus",
+      "originalTitle": "L'Étranger",
+      "era": {
+        "from": 1942,
+        "label": "1942"
+      },
+      "isClue": false,
+      "book": {
+        "author": "Albert Camus",
+        "isbn": "8937462664",
+        "openLibraryKey": "/works/OL1230613W",
+        "coverUrl": "https://covers.openlibrary.org/b/id/13151269-M.jpg",
+        "verified": true
+      }
+    },
+    {
+      "id": "el-tunel",
+      "kind": "book",
+      "label": "El túnel",
+      "subtitle": "Ernesto Sabato",
+      "originalTitle": "El túnel",
+      "era": {
+        "from": 1948,
+        "label": "1948"
+      },
+      "isClue": false,
+      "book": {
+        "author": "Ernesto Sabato",
+        "isbn": "9789584242457",
+        "openLibraryKey": "/works/OL617847W",
+        "coverUrl": "https://covers.openlibrary.org/b/id/5517733-M.jpg",
+        "verified": true
+      }
+    },
+    {
+      "id": "pedro-paramo",
+      "kind": "book",
+      "label": "Pedro Páramo",
+      "subtitle": "Juan Rulfo",
+      "originalTitle": "Pedro Páramo",
+      "era": {
+        "from": 1955,
+        "label": "1955"
+      },
+      "isClue": false,
+      "book": {
+        "author": "Juan Rulfo",
+        "isbn": "9681605012",
+        "openLibraryKey": "/works/OL1731119W",
+        "coverUrl": "https://covers.openlibrary.org/b/id/5419076-M.jpg",
+        "verified": true
+      }
+    },
+    {
+      "id": "la-consciencia-de-zeno",
+      "kind": "book",
+      "label": "La conciencia de Zeno",
+      "subtitle": "Italo Svevo",
+      "originalTitle": "La coscienza di Zeno",
+      "era": {
+        "from": 1923,
+        "label": "1923"
+      },
+      "isClue": false,
+      "book": {
+        "author": "Italo Svevo",
+        "isbn": "9788483467459",
+        "openLibraryKey": "/works/OL24140593W",
+        "coverUrl": "https://covers.openlibrary.org/b/id/10537973-M.jpg",
+        "verified": true
+      }
+    },
+    {
+      "id": "el-ano-pasado-en-marienbad",
+      "kind": "art",
+      "label": "El año pasado en Marienbad",
+      "subtitle": "Cine · Alain Resnais",
+      "era": {
+        "from": 1961,
+        "label": "1961"
+      },
+      "isClue": false
+    },
+    {
+      "id": "john-cage",
+      "kind": "art",
+      "label": "John Cage",
+      "subtitle": "Música · silencio y azar",
+      "era": {
+        "from": 1912,
+        "to": 1992,
+        "label": "1912–1992",
+        "pivot": 1952
+      },
+      "isClue": false
+    },
+    {
+      "id": "demasiado-ruido-soledad",
+      "kind": "book",
+      "label": "Demasiado ruido y soledad",
+      "subtitle": "Bohumil Hrabal",
+      "originalTitle": "Příliš hlučná samota",
+      "era": {
+        "from": 1976,
+        "label": "1976"
+      },
+      "isClue": false,
+      "book": {
+        "author": "Bohumil Hrabal",
+        "isbn": "0233987010",
+        "openLibraryKey": "/works/OL847996W",
+        "coverUrl": "https://covers.openlibrary.org/b/id/4022490-M.jpg",
+        "verified": true
+      }
+    },
+    {
+      "id": "los-anillos-de-saturno",
+      "kind": "book",
+      "label": "Los anillos de Saturno",
+      "subtitle": "W. G. Sebald",
+      "originalTitle": "Die Ringe des Saturn",
+      "era": {
+        "from": 1995,
+        "label": "1995"
+      },
+      "isClue": false,
+      "book": {
+        "author": "W. G. Sebald",
+        "isbn": "9783763245352",
+        "openLibraryKey": "/works/OL46611W",
+        "coverUrl": "https://covers.openlibrary.org/b/id/1029247-M.jpg",
+        "verified": true
+      }
+    },
+    {
+      "id": "la-modificacion",
+      "kind": "book",
+      "label": "La modificación",
+      "subtitle": "Michel Butor",
+      "originalTitle": "La Modification",
+      "era": {
+        "from": 1957,
+        "label": "1957"
+      },
+      "isClue": false,
+      "book": {
+        "author": "Michel Butor",
+        "openLibraryKey": "/works/OL10423645W",
+        "verified": true
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "lispector-desarraigo",
+      "source": "clarice-lispector",
+      "target": "desarraigo",
+      "type": "belongs_to",
+      "confidence": "scholarly",
+      "summary": "Nació en Ucrania y escribió en portugués: escritura de exilio.",
+      "explanation": "Lispector llegó de niña a Brasil desde Ucrania y escribió toda su obra en portugués, una lengua que aprendió en la infancia y desde la que construyó una voz fuera de lugar."
+    },
+    {
+      "id": "hora-desarraigo",
+      "source": "la-hora-de-la-estrella",
+      "target": "desarraigo",
+      "type": "belongs_to",
+      "confidence": "scholarly",
+      "summary": "Macabéa, migrante del nordeste en Río, sin lugar propio.",
+      "explanation": "La protagonista llega a Río desde Alagoas y vive como una extranjera en su propio país: la novela es un retrato del desarraigo social y geográfico."
+    },
+    {
+      "id": "agua-tiempo",
+      "source": "agua-viva",
+      "target": "tiempo-detiene",
+      "type": "belongs_to",
+      "confidence": "scholarly",
+      "summary": "Un texto que intenta capturar el instante puro.",
+      "explanation": "Agua viva se presenta como un 'instante' que la narradora quiere fijar antes de que se disuelva; toda la novela gira sobre el tiempo que se detiene en la escritura."
+    },
+    {
+      "id": "pasion-tiempo",
+      "source": "la-pasion-segun-gh",
+      "target": "tiempo-detiene",
+      "type": "belongs_to",
+      "confidence": "interpretive",
+      "summary": "La crisis de G.H. suspende el tiempo cotidiano.",
+      "explanation": "Encerrada en la habitación de la empleada, G.H. pierde la noción del tiempo y vive un presente absoluto que la desborda."
+    },
+    {
+      "id": "extranjero-desarraigo",
+      "source": "el-extranjero",
+      "target": "desarraigo",
+      "type": "belongs_to",
+      "confidence": "scholarly",
+      "summary": "Meursault como extranjero de sí mismo y de su mundo.",
+      "explanation": "El título de Camus lo dice: Meursault es un extranjero en su propia vida, indiferente a las normas que lo rodean, y la novela es un estudio del desarraigo emocional."
+    },
+    {
+      "id": "tunel-desarraigo",
+      "source": "el-tunel",
+      "target": "desarraigo",
+      "type": "belongs_to",
+      "confidence": "interpretive",
+      "summary": "Castel aislado en su obsesión, sin puente hacia el otro.",
+      "explanation": "El pintor Castel vive en un túnel de celos y soledad donde la comunicación con María resulta imposible; Sabato lo describe como un desarraigo del mundo compartido."
+    },
+    {
+      "id": "paramo-desarraigo",
+      "source": "pedro-paramo",
+      "target": "desarraigo",
+      "type": "belongs_to",
+      "confidence": "scholarly",
+      "summary": "Comala, pueblo de muertos; nadie pertenece del todo.",
+      "explanation": "En Pedro Páramo los personajes son muertos que vagan sin encontrar su lugar; la novela convierte el desarraigo en condición de la vida misma."
+    },
+    {
+      "id": "zeno-tiempo",
+      "source": "la-consciencia-de-zeno",
+      "target": "tiempo-detiene",
+      "type": "belongs_to",
+      "confidence": "interpretive",
+      "summary": "El psicoanálisis como intento de detener la vida que pasa.",
+      "explanation": "Zeno escribe su memoria para fijar un pasado que no puede retener; la escritura misma es un intento de detener el tiempo."
+    },
+    {
+      "id": "modificacion-tiempo",
+      "source": "la-modificacion",
+      "target": "tiempo-detiene",
+      "type": "belongs_to",
+      "confidence": "scholarly",
+      "summary": "Veinte horas de tren que estiran un instante decisivo.",
+      "explanation": "Butor narra en segunda persona un viaje en tren de Roma a París que funciona como un presente dilatado: el tiempo se suspende mientras el protagonista decide su vida."
+    },
+    {
+      "id": "marienbad-tiempo",
+      "source": "tiempo-detiene",
+      "target": "el-ano-pasado-en-marienbad",
+      "type": "other_arts",
+      "confidence": "documented",
+      "summary": "El cine de Resnais congela el tiempo en un hotel.",
+      "explanation": "La película de 1961 trabaja con la memoria y el tiempo detenido: los personajes repiten la misma escena en un hotel donde pasado y presente se confunden."
+    },
+    {
+      "id": "marienbad-agua",
+      "source": "el-ano-pasado-en-marienbad",
+      "target": "agua-viva",
+      "type": "other_arts",
+      "confidence": "interpretive",
+      "summary": "Ambos suspenden el tiempo en la forma misma.",
+      "explanation": "El cine de Resnais y la prosa de Agua viva comparten una búsqueda formal: mostrar el tiempo como un presente que se repite o se detiene."
+    },
+    {
+      "id": "cage-tiempo",
+      "source": "john-cage",
+      "target": "tiempo-detiene",
+      "type": "other_arts",
+      "confidence": "documented",
+      "summary": "4'33\" y la pieza como instante sin tiempo.",
+      "explanation": "La música de Cage, especialmente 4'33\" (1952), suspende el tiempo musical para abrir el oído al presente; es el ejemplo más claro del arte que detiene el tiempo."
+    },
+    {
+      "id": "cage-hrabal",
+      "source": "john-cage",
+      "target": "demasiado-ruido-soledad",
+      "type": "other_arts",
+      "confidence": "interpretive",
+      "summary": "El ruido como forma de escuchar el silencio.",
+      "explanation": "Cage y Hrabal trabajan con el ruido y la soledad como material: la prensa de papel y el silencio sonido de Cage comparten una poética de lo audible como conciencia."
+    },
+    {
+      "id": "hrabal-desarraigo",
+      "source": "demasiado-ruido-soledad",
+      "target": "desarraigo",
+      "type": "belongs_to",
+      "confidence": "interpretive",
+      "summary": "Hanta atrapado en el sótano, fuera del mundo que cambia.",
+      "explanation": "El protagonista vive entre el ruido de la prensa y su propia soledad, ajeno al mundo que lo rodea: una forma de desarraigo elegido."
+    },
+    {
+      "id": "saturno-desarraigo",
+      "source": "los-anillos-de-saturno",
+      "target": "desarraigo",
+      "type": "belongs_to",
+      "confidence": "scholarly",
+      "summary": "Sebald escribe desde el exilio y la ruina de la patria perdida.",
+      "explanation": "Sebald se instaló en Inglaterra y escribió en alemán sobre el exilio y la pérdida de la patria; toda su obra es un trabajo sobre el desarraigo."
+    },
+    {
+      "id": "saturno-tiempo",
+      "source": "los-anillos-de-saturno",
+      "target": "tiempo-detiene",
+      "type": "belongs_to",
+      "confidence": "interpretive",
+      "summary": "Un viaje que suspende el tiempo en la memoria.",
+      "explanation": "Sebald mezcla viaje, memoria y ensayo para detener el tiempo en imágenes y ruinas que se resisten a desaparecer."
+    },
+    {
+      "id": "extranjero-pasion",
+      "source": "el-extranjero",
+      "target": "la-pasion-segun-gh",
+      "type": "shared_theme",
+      "confidence": "scholarly",
+      "summary": "Dos personas frente a un absurdo que los desborda.",
+      "explanation": "Meursault y G.H. atraviesan una experiencia extrema que los separa del mundo cotidiano y los enfrenta a una realidad sin sentido previo."
+    },
+    {
+      "id": "modificacion-pasion",
+      "source": "la-modificacion",
+      "target": "la-pasion-segun-gh",
+      "type": "shared_theme",
+      "confidence": "interpretive",
+      "summary": "El monólogo interior como forma de conocimiento.",
+      "explanation": "Butor y Lispector usan la segunda persona y el monólogo para mostrar una conciencia que se transforma mientras habla."
+    },
+    {
+      "id": "hora-tunel",
+      "source": "la-hora-de-la-estrella",
+      "target": "el-tunel",
+      "type": "shared_theme",
+      "confidence": "scholarly",
+      "summary": "Personajes solitarios en ciudades que no los acogen.",
+      "explanation": "Macabéa y Castel son seres solitarios en la gran ciudad, sin lazos que los sostengan: ambos relatos son retratos de la incomunicación urbana."
+    },
+    {
+      "id": "paramo-saturno",
+      "source": "pedro-paramo",
+      "target": "los-anillos-de-saturno",
+      "type": "shared_theme",
+      "confidence": "interpretive",
+      "summary": "Paisajes de ruinas y fantasmas que persisten.",
+      "explanation": "Rulfo y Sebald construyen mundos donde los muertos y las ruinas del pasado siguen hablando en el presente."
+    }
+  ],
+  "recommendations": [
+    {
+      "nodeId": "la-hora-de-la-estrella",
+      "lane": "affinity",
+      "pitch": "La otra cara de Clarice: la historia de Macabéa, una migrante en Río que vive sin pertenecer a nada. Es su novela más desnuda sobre el desarraigo y la soledad.",
+      "pathSummary": "El desarraigo como punto de partida: Clarice lo escribe desde su propia migración.",
+      "path": [
+        "desarraigo",
+        "la-hora-de-la-estrella"
+      ]
+    },
+    {
+      "nodeId": "agua-viva",
+      "lane": "affinity",
+      "pitch": "La novela que más se acerca a la frase que buscás: un texto sin trama que intenta fijar el instante antes de que se escape. Ideal si querés sentir que el tiempo se detiene en la prosa.",
+      "pathSummary": "El tiempo detenido como programa: Agua viva convierte el instante en escritura.",
+      "path": [
+        "tiempo-detiene",
+        "agua-viva"
+      ]
+    },
+    {
+      "nodeId": "el-extranjero",
+      "lane": "alternative",
+      "pitch": "Otra puerta al desarraigo: Camus narra a un hombre indiferente a su propia vida. La prosa seca y el presente absoluto de Meursault resuenan con la búsqueda de Clarice.",
+      "pathSummary": "El desarraigo como tema compartido entre mentes ajenas a su mundo.",
+      "path": [
+        "desarraigo",
+        "el-extranjero"
+      ]
+    },
+    {
+      "nodeId": "la-consciencia-de-zeno",
+      "lane": "alternative",
+      "pitch": "Otra época, otro idioma: Svevo hace que un hombre escriba su memoria para retener el tiempo. Un antecedente del monólogo interior que Clarice llevaría al extremo.",
+      "pathSummary": "El tiempo que se detiene en la escritura de la memoria, de Trieste a Río.",
+      "path": [
+        "tiempo-detiene",
+        "la-consciencia-de-zeno"
+      ]
+    },
+    {
+      "nodeId": "el-tunel",
+      "lane": "alternative",
+      "pitch": "Desde Argentina, Sabato cuenta el aislamiento de un hombre que no puede comunicarse. Es el desarraigo como túnel: una obsesión que aísla del mundo.",
+      "pathSummary": "El desarraigo compartido: soledad y ciudad en dos novelas del siglo XX.",
+      "path": [
+        "desarraigo",
+        "el-tunel"
+      ]
+    },
+    {
+      "nodeId": "demasiado-ruido-soledad",
+      "lane": "beyond",
+      "pitch": "Un checo en un sótano que destruye libros: un desarraigo elegido, entre el ruido y el silencio. Hrabal comparte con Clarice la obsesión por el instante y la conciencia.",
+      "pathSummary": "El ruido y la soledad como otra forma de detener el tiempo, de Praga a Río.",
+      "path": [
+        "desarraigo",
+        "demasiado-ruido-soledad"
+      ]
+    },
+    {
+      "nodeId": "los-anillos-de-saturno",
+      "lane": "beyond",
+      "pitch": "Sebald viaja a pie por Inglaterra y detiene el tiempo en ruinas y recuerdos. Un emigrado alemán que escribe sobre el desarraigo con la misma atención al instante que Clarice.",
+      "pathSummary": "De Clarice al viaje que se vuelve memoria: el desarraigo de Sebald.",
+      "path": [
+        "desarraigo",
+        "los-anillos-de-saturno"
+      ]
+    }
+  ]
+}
