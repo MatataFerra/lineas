@@ -1,3 +1,6 @@
+// Solo servidor: si algo de cliente importa este módulo, el build falla.
+import "server-only";
+
 /**
  * Cliente mínimo de la API de DeepSeek (compatible con OpenAI Chat Completions).
  * Sin SDK: un fetch tipado alcanza y no suma dependencias.

@@ -1,3 +1,6 @@
+// Solo servidor: si algo de cliente importa este módulo, el build falla.
+import "server-only";
+
 import { GRAPH_LIMITS, type Clue } from "@/lib/graph/schema";
 
 /**

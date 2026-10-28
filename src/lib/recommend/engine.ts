@@ -1,3 +1,6 @@
+// Solo servidor: si algo de cliente importa este módulo, el build falla.
+import "server-only";
+
 import { verifyGraphBooks } from "@/lib/catalog/books";
 import { mockGraphFor } from "@/lib/graph/mock";
 import { ConnectionGraphSchema, type Clue, type ConnectionGraph } from "@/lib/graph/schema";
