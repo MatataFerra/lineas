@@ -85,8 +85,66 @@ export function normalizeRawGraph(raw: unknown, clues: Clue[]): unknown {
 
   const pruned = pruneNodes(nodes, edges, recommendations);
 
+  const repaired = repairPaths(pruned.nodes, pruned.edges, recommendations);
+
   // Las pistas son las del usuario, no las que el modelo dice que recibió.
-  return { version: 1, clues, nodes: pruned.nodes, edges: pruned.edges, recommendations };
+  return { version: 1, clues, nodes: pruned.nodes, edges: pruned.edges, recommendations: repaired };
+}
+
+/**
+ * El error que más reintentos causaba: el recorrido nombra un salto sin arista
+ * (o no arranca en una pista), aunque el mapa sí une la pista con el libro por
+ * otro lado. Si el recorrido no es válido, lo reemplazamos por el camino más
+ * corto (≤ 2 saltos) entre una pista y el libro usando solo aristas que existen,
+ * prefiriendo pasar por los nodos que el modelo había nombrado. No inventa
+ * conexiones; si no hay camino real, se deja como está y lo rechaza la validación.
+ */
+export function repairPaths<R extends { nodeId: unknown; path: unknown[] }>(
+  nodes: Record<string, unknown>[],
+  edges: { source: unknown; target: unknown }[],
+  recommendations: R[],
+  maxHops = 2,
+): R[] {
+  const neighbors = new Map<string, Set<string>>();
+  const link = (a: string, b: string) => (neighbors.get(a) ?? neighbors.set(a, new Set()).get(a)!).add(b);
+  for (const e of edges) {
+    const a = String(e.source);
+    const b = String(e.target);
+    if (a === b) continue;
+    link(a, b);
+    link(b, a);
+  }
+  const clueIds = nodes.filter((n) => n.isClue === true).map((n) => String(n.id));
+  const isValid = (path: string[], target: string) =>
+    path.length >= 2 &&
+    path.length <= maxHops + 1 &&
+    clueIds.includes(path[0]) &&
+    path[path.length - 1] === target &&
+    path.every((id, i) => i === 0 || neighbors.get(path[i - 1])?.has(id));
+
+  return recommendations.map((rec) => {
+    const target = String(rec.nodeId);
+    const path = rec.path.map(String);
+    if (isValid(path, target) || clueIds.includes(target)) return rec;
+
+    const hinted = new Set(path);
+    let best: string[] | undefined;
+    let bestScore = -Infinity;
+    for (const clue of clueIds) {
+      if (neighbors.get(clue)?.has(target)) {
+        const score = 10 + (hinted.has(clue) ? 1 : 0); // directo gana
+        if (score > bestScore) [best, bestScore] = [[clue, target], score];
+      }
+      if (maxHops < 2) continue;
+      for (const mid of neighbors.get(clue) ?? []) {
+        if (mid === target || clueIds.includes(mid) || !neighbors.get(mid)?.has(target)) continue;
+        // Un puente nombrado por el modelo vale más que uno directo: respeta su intención.
+        const score = (hinted.has(mid) ? 20 : 0) + (hinted.has(clue) ? 1 : 0);
+        if (score > bestScore) [best, bestScore] = [[clue, mid, target], score];
+      }
+    }
+    return best ? { ...rec, path: best } : rec;
+  });
 }
 
 type LooseEdge = Record<string, unknown> & { id: string; source: unknown; target: unknown };

@@ -4,7 +4,7 @@ import { MOCK_GRAPH } from "@/lib/graph/mock";
 import type { Clue } from "@/lib/graph/schema";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { EngineError, generateGraphWithLlm } from "./llm-engine";
-import { normalizeRawGraph } from "./normalize";
+import { normalizeRawGraph, repairPaths } from "./normalize";
 
 const CLUES: Clue[] = [
   { id: "c1", kind: "book", label: "On the Road" },
@@ -64,10 +64,25 @@ describe("generateGraphWithLlm", () => {
     expect(messages[1].content).toContain("- book: On the Road");
   });
 
+  it("arregla un recorrido con un salto sin arista usando las aristas que existen, sin reintentar", async () => {
+    const broken = modelOutput((g) => {
+      const recs = g.recommendations as { nodeId: string; path: string[] }[];
+      recs[0].path = ["on-the-road", "siddhartha", recs[0].nodeId];
+    });
+    const events: string[] = [];
+    const { fetch, calls } = fakeFetch(deepseekReply(broken));
+    const graph = await generateGraphWithLlm(CLUES, { ...base, fetch, log: (e) => events.push(e.type) });
+
+    expect(calls).toHaveLength(1);
+    expect(graph.recommendations).toHaveLength(9);
+    expect(events).not.toContain("salvaged");
+  });
+
   it("descarta una recomendación rota sin pagar otro intento si el carril sigue teniendo dos", async () => {
     const broken = modelOutput((g) => {
-      const recs = g.recommendations as { path: string[] }[];
-      recs[0].path = ["on-the-road", "siddhartha", "los-vagabundos-del-dharma"];
+      const recs = g.recommendations as { nodeId: string; path: string[] }[];
+      recs[0].nodeId = "libro-inexistente";
+      recs[0].path = ["on-the-road", "libro-inexistente"];
     });
     const events: string[] = [];
     const { fetch, calls } = fakeFetch(deepseekReply(broken));
@@ -75,14 +90,17 @@ describe("generateGraphWithLlm", () => {
 
     expect(calls).toHaveLength(1);
     expect(graph.recommendations).toHaveLength(8);
-    expect(graph.recommendations.map((r) => r.nodeId)).not.toContain("los-vagabundos-del-dharma");
+    expect(graph.recommendations.map((r) => r.nodeId)).not.toContain("libro-inexistente");
     expect(events).toContain("salvaged");
   });
 
   it("reintenta con los errores concretos cuando descartar dejaría un carril pobre", async () => {
     const broken = modelOutput((g) => {
       const recs = g.recommendations as { lane: string; path: string[] }[];
-      for (const rec of recs.filter((r) => r.lane === "affinity").slice(0, 2)) rec.path = ["on-the-road", "siddhartha"];
+      for (const [i, rec] of recs.filter((r) => r.lane === "affinity").slice(0, 2).entries()) {
+        (rec as { nodeId: string }).nodeId = `libro-inexistente-${i}`;
+        rec.path = ["on-the-road", `libro-inexistente-${i}`];
+      }
     });
     const { fetch, calls } = fakeFetch(deepseekReply(broken), deepseekReply(modelOutput()));
     const graph = await generateGraphWithLlm(CLUES, { ...base, fetch });
@@ -91,7 +109,7 @@ describe("generateGraphWithLlm", () => {
     expect(calls).toHaveLength(2);
     const repair = (calls[1].body.messages as { role: string; content: string }[]).at(-1)!;
     expect(repair.role).toBe("user");
-    expect(repair.content).toContain("No hay arista entre on-the-road y siddhartha");
+    expect(repair.content).toContain("Nodo inexistente: libro-inexistente-0");
   });
 
   it("da vuelta una influencia escrita al revés en vez de rechazarla", async () => {
@@ -287,5 +305,36 @@ describe("corrida real (Clarice Lispector · Desarraigo · tiempo detenido)", ()
     expect(calls).toHaveLength(1);
     expect(graph.nodes.length).toBeLessThanOrEqual(16);
     expect(graph.recommendations).toHaveLength(9);
+  });
+});
+
+describe("repairPaths", () => {
+  const nodes = [
+    { id: "on-the-road", isClue: true },
+    { id: "la-libertad", isClue: true },
+    { id: "parker" },
+    { id: "perseguidor" },
+    { id: "rayuela" },
+  ];
+  const edges = [
+    { source: "parker", target: "on-the-road" },
+    { source: "parker", target: "perseguidor" },
+    { source: "rayuela", target: "la-libertad" },
+  ];
+
+  it("reemplaza un salto sin arista por el camino real, respetando el puente nombrado", () => {
+    const [fixed] = repairPaths(nodes, edges, [{ nodeId: "perseguidor", path: ["la-libertad", "parker", "perseguidor"] }]);
+    expect(fixed.path).toEqual(["on-the-road", "parker", "perseguidor"]);
+  });
+
+  it("usa la arista directa desde otra pista", () => {
+    const [fixed] = repairPaths(nodes, edges, [{ nodeId: "rayuela", path: ["on-the-road", "la-libertad", "rayuela"] }]);
+    expect(fixed.path).toEqual(["la-libertad", "rayuela"]);
+  });
+
+  it("no inventa: sin camino real deja el recorrido como estaba", () => {
+    const rec = { nodeId: "rayuela", path: ["on-the-road", "rayuela"] };
+    const [fixed] = repairPaths(nodes, edges.slice(0, 2), [rec]);
+    expect(fixed).toBe(rec);
   });
 });
