@@ -96,9 +96,9 @@ describe("generateGraphWithLlm", () => {
 
   it("reintenta con los errores concretos cuando descartar dejaría un carril pobre", async () => {
     const broken = modelOutput((g) => {
-      const recs = g.recommendations as { lane: string; path: string[] }[];
+      const recs = g.recommendations as { lane: string; nodeId: string; path: string[] }[];
       for (const [i, rec] of recs.filter((r) => r.lane === "affinity").slice(0, 2).entries()) {
-        (rec as { nodeId: string }).nodeId = `libro-inexistente-${i}`;
+        rec.nodeId = `libro-inexistente-${i}`;
         rec.path = ["on-the-road", `libro-inexistente-${i}`];
       }
     });
