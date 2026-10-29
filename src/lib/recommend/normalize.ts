@@ -36,7 +36,7 @@ export function normalizeRawGraph(raw: unknown, clues: Clue[]): unknown {
     .filter((node) => (seenNodes.has(node.id) ? false : (seenNodes.add(node.id), true)));
 
   const nodeIds = new Set(nodes.map((n) => n.id));
-  const yearById = new Map(nodes.map((n) => [n.id, representativeYear(n.era)]));
+  const spanById = new Map(nodes.map((n) => [n.id, span(n as Record<string, unknown>)]));
   const kindById = new Map(nodes.map((n) => [n.id, String((n as Record<string, unknown>).kind)]));
   const mapId = (value: unknown) => (typeof value === "string" ? (idMap.get(value) ?? slug(value)) : value);
 
@@ -58,9 +58,13 @@ export function normalizeRawGraph(raw: unknown, clues: Clue[]): unknown {
       // (la explicación suele estar bien, solo invirtió los extremos), la damos vuelta.
       const type = (edge as Record<string, unknown>).type;
       if (type !== "influence" && type !== "other_arts") return edge;
-      const from = yearById.get(String(edge.source));
-      const to = yearById.get(String(edge.target));
-      return from !== undefined && to !== undefined && from > to + 2 ? { ...edge, source: edge.target, target: edge.source } : edge;
+      // Solo se invierte si en el orden dado es imposible y al revés no lo es.
+      const s = spanById.get(String(edge.source));
+      const t = spanById.get(String(edge.target));
+      if (!s || !t) return edge;
+      const impossible = s.earliest > t.latest + 2;
+      const reversedOk = t.earliest <= s.latest + 2;
+      return impossible && reversedOk ? { ...edge, source: edge.target, target: edge.source } : edge;
     })
     .filter((edge) => {
       if (!nodeIds.has(String(edge.source)) || !nodeIds.has(String(edge.target))) return false;
@@ -142,6 +146,15 @@ function normalizeEra(era: unknown): unknown {
   const pivot = era.pivot === null || era.pivot === undefined ? undefined : toInt(era.pivot);
   const label = typeof era.label === "string" && era.label.trim() ? clip(era.label, 24) : String(from);
   return { from, ...(to !== undefined ? { to } : {}), label, ...(pivot !== undefined ? { pivot } : {}) };
+}
+
+/** Mismo criterio que el esquema: una persona cuenta por su período (desde los 15). */
+function span(node: Record<string, unknown>): { earliest: number; latest: number } | undefined {
+  const era = node.era;
+  const year = representativeYear(era);
+  if (year === undefined || !isRecord(era)) return undefined;
+  if (typeof era.to !== "number") return { earliest: year, latest: year };
+  return { earliest: (era.from as number) + (node.kind === "person" ? 15 : 0), latest: era.to };
 }
 
 function representativeYear(era: unknown): number | undefined {

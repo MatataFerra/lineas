@@ -111,8 +111,12 @@ export function buildRequestBody(messages: ChatMessage[], config: LlmConfig): Re
       : { type: "json_object" },
     max_tokens: maxTokens,
     // El proveedor más rápido de cada modelo, y solo los que respetan el formato JSON pedido.
-    provider: { sort: "throughput", require_parameters: true },
-    ...(reasoning === "none" ? {} : { reasoning: { effort: reasoning === "max" ? "high" : reasoning } }),
+    // Solo con JSON Schema exigimos soporte completo: si no, modelos que no
+    // aceptan `reasoning` quedarían sin proveedor (404). El JSON roto lo cubre el reintento.
+    provider: { sort: "throughput", require_parameters: Boolean(config.jsonSchema) },
+    // Sin parámetro, muchos modelos razonan por defecto: el razonamiento se come
+    // max_tokens y la respuesta vuelve vacía (finish_reason "length"). Apagarlo explícito.
+    reasoning: { effort: reasoning === "none" ? "none" : reasoning === "max" ? "high" : reasoning },
     usage: { include: true },
   };
 }
@@ -157,6 +161,10 @@ export async function chatJson(messages: ChatMessage[], config: LlmConfig): Prom
   const choice = json?.choices?.[0];
   const content = choice?.message?.content?.trim() ?? "";
   if (!content) {
+    if (choice?.finish_reason === "length") {
+      // Gastó todo el límite (casi siempre razonando): reintentar igual no sirve.
+      throw new LlmError(`${provider} agotó max_tokens sin escribir la respuesta (¿está razonando?)`, response.status, false);
+    }
     // Los modos JSON a veces devuelven contenido vacío; se reintenta.
     throw new LlmError(`${provider} devolvió una respuesta vacía`, response.status, true);
   }

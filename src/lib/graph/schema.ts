@@ -234,7 +234,7 @@ export const ConnectionGraphSchema = z
           ctx.addIssue({ code: "custom", path: ["edges", i, "type"], message: `${e.id}: el destino de belongs_to tiene que ser un movimiento o una idea` });
         }
         // Una influencia va de lo anterior a lo posterior (con 2 años de tolerancia).
-        if ((e.type === "influence" || e.type === "other_arts") && representativeYear(source) > representativeYear(target) + 2) {
+        if ((e.type === "influence" || e.type === "other_arts") && earliestYear(source) > latestYear(target) + 2) {
           ctx.addIssue({
             code: "custom",
             path: ["edges", i, "source"],
@@ -297,6 +297,20 @@ export const ConnectionGraphSchema = z
 export type ConnectionGraph = z.infer<typeof ConnectionGraphSchema>;
 /** Forma de entrada (antes de aplicar defaults), útil para escribir datos a mano. */
 export type ConnectionGraphInput = z.input<typeof ConnectionGraphSchema>;
+
+/**
+ * Para validar la dirección de una influencia, una persona (o un movimiento)
+ * cuenta por todo su período: puede influir desde que empieza (una persona,
+ * desde los 15 años) y recibir influencias hasta que termina. Comparar solo el
+ * pivot daba vuelta casos como Lispector (pivot 1977) → Atwood (1969).
+ */
+function earliestYear(node: { kind?: string; era: { from: number; to?: number; pivot?: number } }): number {
+  if (node.era.to === undefined) return representativeYear(node);
+  return node.kind === "person" ? node.era.from + 15 : node.era.from;
+}
+function latestYear(node: { era: { from: number; to?: number; pivot?: number } }): number {
+  return node.era.to ?? representativeYear(node);
+}
 
 function representativeYear(node: { era: { from: number; to?: number; pivot?: number } }): number {
   const { from, to, pivot } = node.era;
