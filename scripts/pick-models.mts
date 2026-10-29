@@ -27,8 +27,21 @@ const flag = (name: string, fallback: number) => {
 };
 const maxCost = flag("max-cost", 0.03); // US$ por búsqueda
 const top = flag("top", 4);
-const probe = flag("probe", 25); // cuántos modelos consultar en detalle
+const probe = flag("probe", 40); // cuántos modelos consultar en detalle
 
+// La calidad no viene en el catálogo. Los modelos chicos (8B, 20B…) arman
+// mapas genéricos y con errores de autoría, así que solo miramos familias
+// grandes conocidas por cultura general, y descartamos sus variantes chicas.
+const FAMILIES = [
+  "moonshotai/kimi", "deepseek/deepseek", "z-ai/glm", "minimax/", "qwen/qwen3",
+  "openai/gpt-5", "google/gemini", "anthropic/claude", "x-ai/grok", "mistralai/mistral-large", "mistralai/mistral-medium",
+];
+const SMALL = /mini|nano|lite|lightning|tiny|small|distill/i;
+/** Tamaño total en miles de millones si el nombre lo dice (qwen3-235b-a22b → 235). */
+const paramsB = (id: string) => Math.max(0, ...[...id.matchAll(/(\d+(?:\.\d+)?)b\b/gi)].map((m) => Number(m[1])));
+const looksBig = (id: string) => FAMILIES.some((f) => id.startsWith(f)) && !SMALL.test(id) && (paramsB(id) === 0 || paramsB(id) >= 100);
+
+const reasoning = (process.env.LLM_REASONING ?? "none") !== "none";
 const key = process.env.OPENROUTER_API_KEY;
 const headers: Record<string, string> = key ? { Authorization: `Bearer ${key}` } : {};
 
@@ -53,7 +66,8 @@ interface Endpoint {
 
 const costOf = (p: { prompt: string; completion: string }) =>
   Number(p.prompt) * INPUT_TOKENS + Number(p.completion) * OUTPUT_TOKENS;
-const supportsJson = (params?: string[]) => !!params?.includes("response_format");
+// Lo mismo que exige el motor (require_parameters): JSON y, si está activo, razonamiento.
+const supportsJson = (params?: string[]) => !!params?.includes("response_format") && (!reasoning || !!params?.includes("reasoning"));
 
 const res = await fetch(`${API}/models`, { headers }).catch((e: Error) => {
   console.error(`No pude conectar con OpenRouter: ${e.cause ?? e.message}`);
@@ -66,7 +80,7 @@ if (!res.ok) {
 const { data: models } = (await res.json()) as { data: Model[] };
 
 const candidates = models
-  .filter((m) => !m.id.endsWith(":free") && !/batch|preview/i.test(m.id))
+  .filter((m) => !m.id.endsWith(":free") && !/batch|preview/i.test(m.id) && looksBig(m.id))
   .filter((m) => (m.architecture?.output_modalities ?? ["text"]).includes("text"))
   .filter((m) => supportsJson(m.supported_parameters))
   .filter((m) => (m.context_length ?? 0) >= MIN_CONTEXT)
@@ -75,7 +89,8 @@ const candidates = models
   .sort((a, b) => a.cost - b.cost)
   .slice(0, probe);
 
-console.log(`${models.length} modelos en el catálogo · ${candidates.length} devuelven JSON y cuestan ≤ US$ ${maxCost} por búsqueda`);
+if (reasoning) console.log("Ojo: LLM_REASONING está activo; solo cuento modelos que razonan, y van a tardar más.");
+console.log(`${models.length} modelos en el catálogo · ${candidates.length} grandes, devuelven JSON y cuestan ≤ US$ ${maxCost} por búsqueda`);
 console.log(`Consultando velocidad de proveedores…\n`);
 
 let endpointsBlocked = false;
