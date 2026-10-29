@@ -57,6 +57,28 @@ const line = (cells: string[]) => cells.map((c, i) => (i === 0 ? c.padEnd(widths
 console.log(`\n${line(headers)}\n${widths.map((w) => "-".repeat(w)).join("  ")}`);
 for (const r of rows) console.log(line(r));
 
+// Los reintentos son lo que más tiempo cuesta: mostrar por qué se rechazó cada intento.
+const retried = results.filter(({ run }) => run.events.some((e) => e.type === "invalid") || (!run.ok && run.error));
+if (retried.length) {
+  console.log("\nPor qué se rechazaron intentos:");
+  for (const { model, run } of retried) {
+    console.log(`  ${model}`);
+    for (const e of run.events) {
+      if (e.type !== "invalid") continue;
+      const lines = e.reason.split("\n").filter(Boolean);
+      console.log(`    intento ${e.attempt}: ${lines.slice(0, 4).join(" | ")}${lines.length > 4 ? ` | …(+${lines.length - 4})` : ""}`);
+    }
+    if (!run.ok && !run.events.some((e) => e.type === "invalid")) console.log(`    ${run.error}`);
+  }
+}
+
+// Si no se verificó nada, casi siempre es el catálogo (cuota de Google), no el modelo.
+for (const { model, run } of results) {
+  if (!run.ok || !run.misses.length) continue;
+  const outcomes = Object.entries(Object.groupBy(run.misses.flatMap((m) => m.tried), (t) => `${t.source}:${t.outcome}`)).map(([k, v]) => `${k} ×${v?.length}`);
+  console.log(`\n${model}: ${run.misses.length} libros sin verificar · ${outcomes.join(" · ")}`);
+}
+
 console.log("\nGrafos guardados:");
 for (const { model, run } of results) if (run.graph) console.log(`  ${model}: ${saveRun(run.graph, model)}`);
 console.log("\nLos números miden la forma del mapa; si las conexiones son ciertas lo tiene que leer una persona.");
