@@ -28,6 +28,7 @@ pnpm lint
 pnpm typecheck
 pnpm build
 pnpm engine:try "book:Rayuela" "feeling:Nostalgia"   # prueba el motor real sin levantar la app
+pnpm models:pick        # sugiere qué modelos comparar (JSON, precio, velocidad)
 pnpm engine:compare --models a/modelo,b/modelo "book:Rayuela"   # misma búsqueda en varios modelos
 ```
 

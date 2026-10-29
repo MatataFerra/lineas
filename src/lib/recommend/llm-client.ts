@@ -110,8 +110,8 @@ export function buildRequestBody(messages: ChatMessage[], config: LlmConfig): Re
       ? { type: "json_schema", json_schema: { name: "connection_graph", strict: false, schema: config.jsonSchema } }
       : { type: "json_object" },
     max_tokens: maxTokens,
-    // El proveedor más rápido de cada modelo; con JSON Schema, solo los que lo soportan.
-    provider: { sort: "throughput", require_parameters: Boolean(config.jsonSchema) },
+    // El proveedor más rápido de cada modelo, y solo los que respetan el formato JSON pedido.
+    provider: { sort: "throughput", require_parameters: true },
     ...(reasoning === "none" ? {} : { reasoning: { effort: reasoning === "max" ? "high" : reasoning } }),
     usage: { include: true },
   };

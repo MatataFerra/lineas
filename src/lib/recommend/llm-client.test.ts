@@ -33,7 +33,7 @@ describe("buildRequestBody", () => {
       model: "moonshotai/kimi-k2.6",
       models: ["moonshotai/kimi-k2.6", "otro/modelo"],
       response_format: { type: "json_object" },
-      provider: { sort: "throughput", require_parameters: false },
+      provider: { sort: "throughput", require_parameters: true },
       usage: { include: true },
     });
     expect(body).not.toHaveProperty("reasoning");
