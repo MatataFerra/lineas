@@ -1,4 +1,4 @@
-import { ConnectionGraphSchema, type BookRef, type ConnectionGraph, type Lane } from "@/lib/graph/schema";
+import type { BookRef, ConnectionGraph, Lane } from "@/lib/graph/schema";
 
 /**
  * Verificación de libros contra catálogos reales (Google Books y, si no
@@ -137,9 +137,11 @@ async function searchOpenLibrary(title: string, author: string, { timeoutMs = 50
 /** Marca cada libro del grafo como verificado (o no) y descarta recomendaciones dudosas cuando hay alternativas. */
 export async function verifyGraphBooks(
   graph: ConnectionGraph,
-  options: CatalogOptions & { onMiss?: (report: LookupReport) => void } = {},
+  options: CatalogOptions & { onMiss?: (report: LookupReport) => void; onlyRecommended?: boolean } = {},
 ): Promise<ConnectionGraph> {
-  const books = graph.nodes.filter((n) => n.kind === "book");
+  const recommended = new Set(graph.recommendations.map((r) => r.nodeId));
+  // Solo se muestran portadas de lo recomendado: verificar las pistas o los puentes es tiempo perdido.
+  const books = graph.nodes.filter((n) => n.kind === "book" && (!options.onlyRecommended || recommended.has(n.id)));
   const reports = await Promise.all(
     books.map((n) => lookupBook([n.label, n.originalTitle ?? ""], n.book?.author ?? n.subtitle ?? "", options)),
   );
@@ -147,7 +149,7 @@ export async function verifyGraphBooks(
   const byId = new Map(books.map((n, i) => [n.id, reports[i].match]));
 
   const nodes = graph.nodes.map((node) => {
-    if (node.kind !== "book") return node;
+    if (node.kind !== "book" || !byId.has(node.id)) return node;
     const match = byId.get(node.id);
     const book: BookRef = {
       author: node.book?.author ?? node.subtitle ?? "",
@@ -167,7 +169,8 @@ export async function verifyGraphBooks(
   }
   const recommendations = graph.recommendations.filter((rec) => verified.has(rec.nodeId) || !verifiedPerLane.get(rec.lane));
 
-  return ConnectionGraphSchema.parse({ ...graph, nodes, recommendations });
+  // Solo cambian datos de catálogo y se filtran recomendaciones: el grafo sigue cumpliendo el contrato.
+  return { ...graph, nodes, recommendations };
 }
 
 /* ------------------------------------------------------------------ */

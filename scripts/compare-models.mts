@@ -51,7 +51,7 @@ const results = await Promise.all(
 );
 
 const rows = results.map(({ model, run }) => row(model, run));
-const headers = ["modelo", "ok", "intentos", "modelo s", "total s", "tokens sal.", "costo US$", "recs", "verif.", "2 saltos", "historia", "interpret."];
+const headers = ["modelo", "ok", "intentos", "1er carril s", "total s", "tokens sal.", "costo US$", "recs", "verif.", "2 saltos", "historia", "interpret."];
 const widths = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)));
 const line = (cells: string[]) => cells.map((c, i) => (i === 0 ? c.padEnd(widths[i]) : c.padStart(widths[i]))).join("  ");
 console.log(`\n${line(headers)}\n${widths.map((w) => "-".repeat(w)).join("  ")}`);
@@ -66,7 +66,7 @@ if (retried.length) {
     for (const e of run.events) {
       if (e.type !== "invalid") continue;
       const lines = e.reason.split("\n").filter(Boolean);
-      console.log(`    intento ${e.attempt}: ${lines.slice(0, 4).join(" | ")}${lines.length > 4 ? ` | …(+${lines.length - 4})` : ""}`);
+      console.log(`    ${e.lane} intento ${e.attempt}: ${lines.slice(0, 4).join(" | ")}${lines.length > 4 ? ` | …(+${lines.length - 4})` : ""}`);
     }
     if (!run.ok && !run.events.some((e) => e.type === "invalid")) console.log(`    ${run.error}`);
   }
@@ -89,7 +89,7 @@ function row(model: string, run: RunResult): string[] {
     model,
     run.ok ? "sí" : "no",
     String(run.attempts),
-    (run.llmMs / 1000).toFixed(1),
+    (run.firstLaneMs / 1000).toFixed(1),
     (run.totalMs / 1000).toFixed(1),
     String(run.usage.output),
     run.usage.costUsd !== undefined ? run.usage.costUsd.toFixed(4) : "—",

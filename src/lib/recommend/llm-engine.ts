@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { ConnectionGraphSchema, type Clue, type ConnectionGraph } from "@/lib/graph/schema";
+import { GRAPH_LIMITS, laneGraphSchema, type ConnectionGraph, type Lane } from "@/lib/graph/schema";
 import { chatJson, LlmError, type ChatMessage, type LlmConfig, type LlmUsage } from "./llm-client";
 import { normalizeRawGraph } from "./normalize";
-import { buildRepairPrompt, buildUserPrompt, SYSTEM_PROMPT } from "./prompt";
+import { buildLanePrompt, buildRepairPrompt, SYSTEM_PROMPT, type LanePromptInput } from "./prompt";
 
 export interface LlmEngineOptions extends Partial<Omit<LlmConfig, "apiKey">> {
   apiKey: string;
@@ -10,13 +10,15 @@ export interface LlmEngineOptions extends Partial<Omit<LlmConfig, "apiKey">> {
   model?: string;
   /** Intentos totales, contando el primero. */
   maxAttempts?: number;
+  /** Tiempo máximo para el carril, sumando reintentos. */
+  deadlineMs?: number;
   log?: (event: LlmEvent) => void;
 }
 
 export type LlmEvent =
   | { type: "attempt"; attempt: number }
   | { type: "invalid"; attempt: number; reason: string }
-  /** Se aceptó el grafo descartando recomendaciones o aristas que no cumplían. */
+  /** Se aceptó el grafo descartando aristas que no cumplían. */
   | { type: "salvaged"; attempt: number; droppedRecommendations: string[]; droppedEdges: string[] }
   | { type: "success"; attempt: number; usage: LlmUsage[]; model: string };
 
@@ -31,31 +33,39 @@ export class EngineError extends Error {
 }
 
 /**
- * Pide el grafo al modelo, lo repara, lo valida y, si no cumple el contrato,
- * reintenta mostrándole los errores concretos. Nada llega al cliente sin pasar
- * por ConnectionGraphSchema.
+ * Pide al modelo el subgrafo de un carril (una recomendación y su recorrido),
+ * lo repara, lo valida y, si no cumple el contrato, reintenta mostrándole los
+ * errores concretos. Nada llega al cliente sin pasar por laneGraphSchema.
  */
-export async function generateGraphWithLlm(clues: Clue[], options: LlmEngineOptions): Promise<ConnectionGraph> {
-  const { maxAttempts = 3, log = () => {}, model, ...rest } = options;
+export async function generateLaneWithLlm(
+  input: Omit<LanePromptInput, "lane"> & { lane: Lane },
+  options: LlmEngineOptions,
+): Promise<ConnectionGraph> {
+  const { maxAttempts = 2, deadlineMs = 20_000, log = () => {}, model, ...rest } = options;
+  const { clues, lane } = input;
   const config: LlmConfig = {
     provider: "deepseek",
     ...rest,
     models: rest.models?.length ? rest.models : [model ?? "deepseek-flash"],
   };
+  const schema = laneGraphSchema(lane);
+  const deadline = Date.now() + deadlineMs;
   let answeredBy = config.models[0];
   const messages: ChatMessage[] = [
     { role: "system", content: SYSTEM_PROMPT },
-    { role: "user", content: buildUserPrompt(clues) },
+    { role: "user", content: buildLanePrompt(input) },
   ];
   const usage: LlmUsage[] = [];
   let lastIssues: string | undefined;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new EngineError(`El carril ${lane} tardó demasiado`, lastIssues);
     log({ type: "attempt", attempt });
 
     let content: string;
     try {
-      const result = await chatJson(messages, config);
+      const result = await chatJson(messages, { ...config, timeoutMs: Math.min(config.timeoutMs ?? Infinity, remaining) });
       content = result.content;
       answeredBy = result.model;
       if (result.usage) usage.push(result.usage);
@@ -67,7 +77,7 @@ export async function generateGraphWithLlm(clues: Clue[], options: LlmEngineOpti
     } catch (error) {
       if (error instanceof LlmError && error.retryable && attempt < maxAttempts) {
         log({ type: "invalid", attempt, reason: error.message });
-        await sleep(400 * attempt);
+        await sleep(300 * attempt);
         continue;
       }
       throw error;
@@ -83,16 +93,15 @@ export async function generateGraphWithLlm(clues: Clue[], options: LlmEngineOpti
       continue;
     }
 
-    const candidate = normalizeRawGraph(raw, clues);
-    const parsed = ConnectionGraphSchema.safeParse(candidate);
+    const candidate = normalizeRawGraph(raw, clues, { maxNodes: GRAPH_LIMITS.maxNodesPerLane });
+    const parsed = schema.safeParse(candidate);
     if (parsed.success) {
       log({ type: "success", attempt, usage, model: answeredBy });
       return parsed.data;
     }
 
-    // Antes de pagar otro intento: ¿alcanza con descartar lo que está mal?
-    // En intentos intermedios exigimos 2 recomendaciones por carril; en el último, 1.
-    const salvaged = salvage(candidate, attempt === maxAttempts ? 1 : 2);
+    // Antes de pagar otro intento: ¿alcanza con descartar las aristas que están mal?
+    const salvaged = salvage(candidate, schema);
     if (salvaged) {
       log({ type: "salvaged", attempt, droppedRecommendations: salvaged.droppedRecommendations, droppedEdges: salvaged.droppedEdges });
       log({ type: "success", attempt, usage, model: answeredBy });
@@ -104,7 +113,7 @@ export async function generateGraphWithLlm(clues: Clue[], options: LlmEngineOpti
     messages.push({ role: "assistant", content }, { role: "user", content: buildRepairPrompt(lastIssues) });
   }
 
-  throw new EngineError(`El modelo no devolvió un grafo válido en ${maxAttempts} intentos`, lastIssues);
+  throw new EngineError(`El modelo no devolvió un carril ${lane} válido en ${maxAttempts} intentos`, lastIssues);
 }
 
 interface Salvaged {
@@ -115,10 +124,10 @@ interface Salvaged {
 
 /**
  * Descarta aristas y recomendaciones inválidas mientras los errores sean solo
- * de esos elementos. Si hay un problema global (nodos, carriles vacíos) o un
- * carril queda con menos de `minPerLane`, devuelve null y se reintenta.
+ * de esos elementos. Si hay un problema global (nodos, carril vacío) devuelve
+ * null y se reintenta.
  */
-export function salvage(candidate: unknown, minPerLane: number): Salvaged | null {
+export function salvage(candidate: unknown, schema: z.ZodType<ConnectionGraph>): Salvaged | null {
   if (typeof candidate !== "object" || candidate === null) return null;
   let current = structuredClone(candidate) as { edges: { id?: unknown }[]; recommendations: { nodeId?: unknown }[] };
   if (!Array.isArray(current.edges) || !Array.isArray(current.recommendations)) return null;
@@ -126,13 +135,8 @@ export function salvage(candidate: unknown, minPerLane: number): Salvaged | null
   const droppedEdges: string[] = [];
 
   for (let round = 0; round < 5; round++) {
-    const result = ConnectionGraphSchema.safeParse(current);
-    if (result.success) {
-      const perLane = new Map<string, number>();
-      for (const rec of result.data.recommendations) perLane.set(rec.lane, (perLane.get(rec.lane) ?? 0) + 1);
-      const enough = [...perLane.values()].every((n) => n >= minPerLane) && perLane.size === 3;
-      return enough ? { graph: result.data, droppedRecommendations, droppedEdges } : null;
-    }
+    const result = schema.safeParse(current);
+    if (result.success) return { graph: result.data, droppedRecommendations, droppedEdges };
 
     const badEdges = new Set<number>();
     const badRecs = new Set<number>();
