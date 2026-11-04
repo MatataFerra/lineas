@@ -114,7 +114,7 @@ export function ConnectionsScreen() {
             <div className="mt-[18px] hidden items-start gap-5 lg:flex">
               <section aria-label="Mapa" className="min-w-0 flex-[999_1_640px] overflow-hidden rounded-2xl border border-line bg-surface">
                 <div className="px-3 pt-2">
-                  <GraphCanvas model={model} view={view} selection={selection} onSelect={setSelection} />
+                  <GraphCanvas nodes={model.graph.nodes} focusId={view.rec.nodeId} view={view} selection={selection} onSelect={setSelection} />
                 </div>
                 <MapControls
                   maxHops={maxHops}
@@ -280,7 +280,7 @@ function FullMapDialog({ model, view, title, onClose }: { model: GraphModel; vie
           <span className="w-11" />
         </div>
         <div ref={scroller} className="no-scrollbar min-h-0 flex-1 overflow-auto bg-surface pt-6">
-          <GraphCanvas model={model} view={view} selection={{ kind: "path" }} />
+          <GraphCanvas nodes={model.graph.nodes} focusId={view.rec.nodeId} view={view} selection={{ kind: "path" }} />
         </div>
         <p className="shrink-0 border-t border-line px-5 pt-3 pb-6 text-xs leading-normal text-muted">
           En acento, el camino hacia <span className="text-ink">{title}</span>. Los números siguen el orden del recorrido.

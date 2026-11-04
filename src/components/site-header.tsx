@@ -9,7 +9,7 @@ import { MenuIcon, UserIcon } from "./icons";
 
 const NAV = [
   { href: "/", label: "Descubrir", match: ["/", "/resultados", "/conexiones", "/libro"] },
-  { href: "#", label: "Explorar", match: [] as string[] },
+  { href: "/explorar", label: "Explorar", match: ["/explorar"] },
   { href: "/biblioteca", label: "Mi biblioteca", match: ["/biblioteca"] },
 ];
 

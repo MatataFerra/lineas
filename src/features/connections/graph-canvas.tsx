@@ -6,13 +6,18 @@ import { Portrait } from "@/components/portrait";
 import { NODE_KIND_LABEL } from "@/lib/graph/labels";
 import { RADIAL, radialEdge, radialLayout } from "@/lib/graph/radial";
 import type { GraphNode } from "@/lib/graph/schema";
-import type { GraphModel, Selection, ViewState } from "./model";
+import type { Selection, ViewState } from "./model";
 
 const MIN_WIDTH = 640;
 
+/** Lo que el mapa necesita de la vista: qué se ve, qué se ilumina y los pasos numerados. */
+export type CanvasView = Pick<ViewState, "visibleNodes" | "visibleEdges" | "highlightNodes" | "highlightEdges" | "steps">;
+
 interface GraphCanvasProps {
-  model: GraphModel;
-  view: ViewState;
+  nodes: GraphNode[];
+  /** El nodo del centro: el libro del recorrido, o el tema de un rincón de Explorar. */
+  focusId: string;
+  view: CanvasView;
   selection: Selection;
   /** Sin handlers, el mapa es solo de lectura (mapa completo en mobile). */
   onSelect?: (selection: Selection) => void;
@@ -23,9 +28,7 @@ interface GraphCanvasProps {
  * movimientos e ideas en un arco arriba y los libros abajo, de lo más antiguo
  * a lo más nuevo. Las aristas van en un <svg> debajo; los nodos son botones HTML encima.
  */
-export function GraphCanvas({ model, view, selection, onSelect }: GraphCanvasProps) {
-  const { graph } = model;
-  const focusId = view.rec.nodeId;
+export function GraphCanvas({ nodes, focusId, view, selection, onSelect }: GraphCanvasProps) {
   // El mapa toma el ancho del contenedor; por debajo de MIN_WIDTH se dibuja a ese ancho y se achica entero.
   const box = useRef<HTMLDivElement>(null);
   const [available, setAvailable] = useState(0);
@@ -38,7 +41,7 @@ export function GraphCanvas({ model, view, selection, onSelect }: GraphCanvasPro
   }, []);
   const width = available ? Math.max(available, MIN_WIDTH) : RADIAL.width;
   const scale = available ? Math.min(1, available / width) : 1;
-  const layout = useMemo(() => radialLayout(graph.nodes, focusId, view.visibleNodes, width), [graph.nodes, focusId, view.visibleNodes, width]);
+  const layout = useMemo(() => radialLayout(nodes, focusId, view.visibleNodes, width), [nodes, focusId, view.visibleNodes, width]);
   const center = layout.positions.get(focusId)!;
   const interactive = !!onSelect;
   const showSteps = selection.kind === "path";
@@ -90,7 +93,7 @@ export function GraphCanvas({ model, view, selection, onSelect }: GraphCanvasPro
           })}
         </svg>
 
-        {graph.nodes
+        {nodes
           .filter((node) => layout.positions.has(node.id))
           .map((node) => {
             const pos = layout.positions.get(node.id)!;
