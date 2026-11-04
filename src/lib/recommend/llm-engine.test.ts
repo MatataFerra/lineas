@@ -343,6 +343,19 @@ describe("corrida real (Clarice Lispector · Desarraigo · tiempo detenido)", ()
   });
 });
 
+describe("belongs_to mal dirigido", () => {
+  it("invierte movimiento → libro y convierte persona → persona en tema en común", () => {
+    const raw = JSON.parse(modelOutput((g) => {
+      const edges = g.edges as Record<string, unknown>[];
+      edges.push({ id: "beat-aullido", source: "generacion-beat", target: "aullido", type: "belongs_to", confidence: "documented", summary: "s", explanation: "e" });
+      edges.push({ id: "wolfe-rimbaud", source: "thomas-wolfe", target: "arthur-rimbaud", type: "belongs_to", confidence: "interpretive", summary: "s", explanation: "e" });
+    }));
+    const out = normalizeRawGraph(raw, CLUES) as { edges: { id: string; type: string; source: string; target: string }[] };
+    expect(out.edges.find((e) => e.id === "beat-aullido")).toMatchObject({ type: "belongs_to", source: "aullido", target: "generacion-beat" });
+    expect(out.edges.find((e) => e.id === "wolfe-rimbaud")?.type).toBe("shared_theme");
+  });
+});
+
 describe("repairPaths", () => {
   const nodes = [
     { id: "on-the-road", isClue: true },

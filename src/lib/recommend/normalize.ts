@@ -173,6 +173,8 @@ type LooseEdge = Record<string, unknown> & { id: string; source: unknown; target
  * - libro → idea marcado como belongs_to → shared_theme: una novela no "pertenece"
  *   al desarraigo, lo comparte.
  * - una idea como origen de other_arts → shared_theme.
+ * - belongs_to hacia algo que no es un movimiento: invertido si va del movimiento
+ *   al libro; si no, shared_theme.
  */
 function retype<E extends LooseEdge>(edge: E, kindById: Map<string, string>): E {
   const sourceKind = kindById.get(String(edge.source));
@@ -183,6 +185,11 @@ function retype<E extends LooseEdge>(edge: E, kindById: Map<string, string>): E 
     if (sourceKind === "book" && targetKind === "person") return { ...edge, type: "authored", source: edge.target, target: edge.source };
   }
   if (type === "belongs_to" && (targetKind === "concept" || sourceKind === "concept")) return { ...edge, type: "shared_theme" };
+  if (type === "belongs_to" && targetKind !== "movement") {
+    // Escrito al revés (movimiento → libro): se invierte. Si no, es una afinidad, no una pertenencia.
+    if (sourceKind === "movement") return { ...edge, source: edge.target, target: edge.source };
+    return { ...edge, type: "shared_theme" };
+  }
   if (type === "other_arts" && (sourceKind === "concept" || targetKind === "concept")) return { ...edge, type: "shared_theme" };
   return edge;
 }

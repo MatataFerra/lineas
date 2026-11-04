@@ -42,6 +42,8 @@ Tablas (todas con RLS, cada usuario ve solo lo suyo):
 
 - `library_items`: guardados y leídos (`status` = `saved` | `read`), con una copia mínima del libro.
 - `searches`: pistas y el grafo completo de cada búsqueda.
+- `kg_nodes`, `kg_edges`, `edge_votes`, `rec_signals`: relaciones validadas (ver abajo).
+- `graph_cache`: carriles ya generados; solo el servidor, con `SUPABASE_SECRET_KEY`.
 
 La sesión se refresca en `src/proxy.ts` (en Next 16 `proxy` reemplaza a `middleware`). Lo que se marca antes de iniciar sesión se sube a la cuenta al entrar.
 
@@ -49,22 +51,38 @@ La sesión se refresca en `src/proxy.ts` (en Next 16 `proxy` reemplaza a `middle
 
 `src/lib/recommend/config.ts` elige el motor según las variables de entorno:
 
-- **OpenRouter** (`OPENROUTER_API_KEY`): una clave para muchos modelos. `LLM_MODELS` es una lista: el primero es el preferido y el resto son respaldos si falla. Cada pedido va al proveedor más rápido de ese modelo (`provider.sort: "throughput"`). Por defecto `moonshotai/kimi-k2.6`.
+- **OpenRouter** (`OPENROUTER_API_KEY`): una clave para muchos modelos. `LLM_MODELS` es una lista: el primero es el preferido y el resto son respaldos si falla. Cada pedido va al proveedor más rápido de ese modelo (`provider.sort: "throughput"`). Por defecto `anthropic/claude-haiku-5.5` con respaldo `deepseek/deepseek-v4.1-flash-1017` (elegidos con `engine:compare`: el más rápido sin reintentos).
 - **DeepSeek** (`DEEPSEEK_API_KEY`): la API oficial, `deepseek-flash` por defecto.
-- **Mock**: sin claves, o con `LINEAS_ENGINE=mock`.
+- **Mock**: sin claves, o con `LINEAS_ENGINE=mock`. Emite los carriles con demoras escalonadas, para diseñar la llegada sin gastar tokens.
 
-`LLM_REASONING` (none/low/high/max) activa el razonamiento: los mapas salen mejor armados pero mucho más lentos. `LLM_JSON_SCHEMA=1` pide a OpenRouter salida con JSON Schema (`output-schema.ts`) y lo manda solo a proveedores que lo soportan.
+### Tres carriles en paralelo, por stream
 
-Para elegir modelo con datos: `pnpm engine:compare --models a,b,c "pista:…"` corre la misma búsqueda en paralelo y compara tiempo, tokens, costo y forma del mapa (recorridos de 2 saltos, aristas de historia, % de interpretaciones), con `src/lib/recommend/quality.ts`.
+Cada carril (afinidad, alternativo, fuera de tu mapa) es un pedido aparte con **una** recomendación y su recorrido. Los tres corren en paralelo y `/api/recommend` los manda al navegador como **NDJSON** apenas cada uno está listo (`src/lib/recommend/events.ts`):
 
-Con un modelo real, cada búsqueda:
+- `lane`: el subgrafo de un carril, validado con `laneGraphSchema(lane)`.
+- `patch`: la verificación en catálogos llegó tarde (portada, `verified`).
+- `lane-error`: ese carril falló; los otros siguen.
+- `done`.
 
-1. Pide el grafo en modo JSON (`prompt.ts`, cliente en `llm-client.ts`). El mensaje de sistema es fijo para aprovechar el cache de prompts de los proveedores; las pistas van en el mensaje del usuario.
-2. Repara lo mecánico en `normalize.ts` (largos, ids, nodos repetidos, aristas sueltas, influencias escritas al revés) y valida con `ConnectionGraphSchema`.
-3. Si lo único que falla son algunas recomendaciones o aristas, las descarta sin pagar otro intento, siempre que cada carril conserve al menos 2 (`salvage`). Si no, reintenta mostrándole al modelo los errores concretos (hasta 3 intentos en total).
-4. Verifica cada libro contra Google Books y, si no aparece, Open Library (`src/lib/catalog/books.ts`), probando el título en español y el original (`originalTitle`): marca `verified`, agrega portada e ids. Conviene configurar `GOOGLE_BOOKS_API_KEY`: sin clave, Google comparte una cuota que se agota rápido. Una recomendación no verificada se descarta si su carril tiene otra verificada; si no, se muestra con la etiqueta «Sin verificar en catálogos».
+Por carril (`engine.ts`, `llm-engine.ts`):
 
-`/api/recommend` limita a 8 búsquedas por IP cada 10 minutos y cachea en memoria las búsquedas repetidas por 24 h. Ambos son por instancia: alcanzan para empezar, no para producción con tráfico.
+1. Busca primero en el cache (`lane-cache.ts`): alternativas ya generadas para esas pistas y ese carril, 30 días, en Supabase (`graph_cache`) si hay `SUPABASE_SECRET_KEY` y si no en memoria. La clave incluye un hash del prompt: cambiarlo invalida el cache.
+2. Si no hay, pide el subgrafo al modelo. El servidor fija los ids de las pistas (`clueNodeIds`) para que los carriles se puedan unir. Las conexiones validadas por lectores cercanas a las pistas entran al prompt (`knowledge.ts`, con un presupuesto de 150 ms).
+3. Repara lo mecánico en `normalize.ts`, valida, descarta aristas rotas sin pagar otro intento (`salvage`) y, si hace falta, hace **un** reintento mostrándole los errores, dentro de 20 s.
+4. Si otro carril ya mostró ese autor o ese libro, se regenera una vez excluyéndolo.
+5. Verifica el libro recomendado contra Google Books / Open Library. Si el catálogo tarda más de 1,5 s, el carril sale «sin verificar» y la verificación llega después como `patch`.
+
+«No es lo que busco · ver otra» recorre las opciones ya recibidas y, al final, pide un carril nuevo con los libros a excluir. Límite por IP cada 10 minutos: 8 búsquedas y 20 «ver otra» (en memoria, por instancia).
+
+Para elegir modelo con datos: `pnpm engine:compare --models a,b,c "pista:…"` corre los tres carriles en paralelo con cada modelo y compara cuándo llega el primer carril, el total, tokens, costo y forma del mapa (`quality.ts`).
+
+### Relaciones validadas por lectores
+
+En el recorrido, cada conexión tiene «¿Te convence?» y cada recomendación «¿Te sirve?». Guardar, «Ya lo leí» y «ver otra» cuentan como señales implícitas. Votan solo usuarios con sesión y el agregado es global:
+
+- `kg_nodes` / `kg_edges`: grafo canónico. Una arista entra cuando alguien la vota o guarda el libro de su recorrido; lleva `up`, `down` y `score`.
+- `edge_votes`: un voto por usuario y arista. `rec_signals`: señales sobre recomendaciones.
+- Se escribe solo por RPC (`vote_edge`, `record_rec_signal`), que recalculan los contadores en la misma transacción; las tablas `kg_*` se leen con la clave pública.
 
 ## Estructura
 
@@ -74,7 +92,7 @@ src/
     page.tsx                 Inicio
     resultados/page.tsx      Tres carriles de recomendaciones
     conexiones/page.tsx      Mapa (desktop) / recorrido vertical (mobile)
-    api/recommend/route.ts   POST { clues } → ConnectionGraph validado
+    api/recommend/route.ts   POST { clues, lane?, exclude? } → stream NDJSON de carriles
     auth/callback/route.ts   canje del enlace mágico (PKCE)
     ingresar/page.tsx        login por email
     biblioteca/page.tsx      Mi biblioteca

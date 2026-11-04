@@ -17,7 +17,8 @@ import { llmOutputJsonSchema } from "./output-schema";
 export type EngineName = "mock" | ProviderName;
 
 export const DEFAULT_MODELS: Record<ProviderName, string[]> = {
-  openrouter: ["moonshotai/kimi-k2.6"],
+  // Elegidos con engine:compare (noviembre 2026): el más rápido sin reintentos, y un respaldo.
+  openrouter: ["anthropic/claude-haiku-5.5", "deepseek/deepseek-v4.1-flash-1017"],
   deepseek: ["deepseek-flash"],
 };
 
