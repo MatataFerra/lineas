@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BookCover } from "@/components/book-cover";
 import { NodeKindIcon } from "@/components/icons";
 import { NODE_KIND_LABEL } from "@/lib/graph/labels";
 import { RADIAL, radialEdge, radialLayout } from "@/lib/graph/radial";
 import type { GraphNode } from "@/lib/graph/schema";
 import type { GraphModel, Selection, ViewState } from "./model";
+
+const MIN_WIDTH = 640;
 
 interface GraphCanvasProps {
   model: GraphModel;
@@ -24,7 +26,19 @@ interface GraphCanvasProps {
 export function GraphCanvas({ model, view, selection, onSelect }: GraphCanvasProps) {
   const { graph } = model;
   const focusId = view.rec.nodeId;
-  const layout = useMemo(() => radialLayout(graph.nodes, focusId, view.visibleNodes), [graph.nodes, focusId, view.visibleNodes]);
+  // El mapa toma el ancho del contenedor; por debajo de MIN_WIDTH se dibuja a ese ancho y se achica entero.
+  const box = useRef<HTMLDivElement>(null);
+  const [available, setAvailable] = useState(0);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => setAvailable(Math.round(entry.contentRect.width)));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  const width = available ? Math.max(available, MIN_WIDTH) : RADIAL.width;
+  const scale = available ? Math.min(1, available / width) : 1;
+  const layout = useMemo(() => radialLayout(graph.nodes, focusId, view.visibleNodes, width), [graph.nodes, focusId, view.visibleNodes, width]);
   const center = layout.positions.get(focusId)!;
   const interactive = !!onSelect;
   const showSteps = selection.kind === "path";
@@ -36,83 +50,85 @@ export function GraphCanvas({ model, view, selection, onSelect }: GraphCanvasPro
   });
 
   return (
-    <div className="relative mx-auto" style={{ width: layout.width, height: layout.height }}>
-      <svg width={layout.width} height={layout.height} className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden="true">
-        {/* El halo del libro elegido: un anillo fino con dos marcas, como un sello. */}
-        <circle cx={center.x} cy={center.y} r={RADIAL.focus / 2 + 14} fill="none" className="stroke-accent/25" strokeWidth={1} />
-        <circle cx={center.x} cy={center.y - RADIAL.focus / 2 - 14} r={2.5} className="fill-accent" />
-        <circle cx={center.x} cy={center.y + RADIAL.focus / 2 + 14} r={2.5} className="fill-accent" />
-        {edges.map(({ edge, d }) => {
-          const hi = view.highlightEdges.has(edge.id);
-          return (
-            <g key={edge.id} className="transition-opacity duration-300" style={{ opacity: hi ? 1 : 0.7 }}>
-              <path d={d} fill="none" className={hi ? "stroke-accent" : "stroke-edge/60"} strokeWidth={hi ? 1.6 : 1} strokeLinecap="round" />
-              {interactive && (
-                <path
-                  d={d}
-                  fill="none"
-                  stroke="transparent"
-                  strokeWidth={16}
-                  pointerEvents="stroke"
-                  className="cursor-pointer"
-                  onClick={() => onSelect({ kind: "edge", id: edge.id })}
-                />
-              )}
-            </g>
-          );
-        })}
-      </svg>
+    <div ref={box} className="w-full" style={{ height: layout.height * scale }}>
+      <div className="relative origin-top-left" style={{ width: layout.width, height: layout.height, transform: scale < 1 ? `scale(${scale})` : undefined }}>
+        <svg width={layout.width} height={layout.height} className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden="true">
+          {/* El halo del libro elegido: un anillo fino con dos marcas, como un sello. */}
+          <circle cx={center.x} cy={center.y} r={RADIAL.focus / 2 + 14} fill="none" className="stroke-accent/25" strokeWidth={1} />
+          <circle cx={center.x} cy={center.y - RADIAL.focus / 2 - 14} r={2.5} className="fill-accent" />
+          <circle cx={center.x} cy={center.y + RADIAL.focus / 2 + 14} r={2.5} className="fill-accent" />
+          {edges.map(({ edge, d }) => {
+            const hi = view.highlightEdges.has(edge.id);
+            return (
+              <g key={edge.id} className="transition-opacity duration-300" style={{ opacity: hi ? 1 : 0.7 }}>
+                <path d={d} fill="none" className={hi ? "stroke-accent" : "stroke-edge/60"} strokeWidth={hi ? 1.6 : 1} strokeLinecap="round" />
+                {interactive && (
+                  <path
+                    d={d}
+                    fill="none"
+                    stroke="transparent"
+                    strokeWidth={16}
+                    pointerEvents="stroke"
+                    className="cursor-pointer"
+                    onClick={() => onSelect({ kind: "edge", id: edge.id })}
+                  />
+                )}
+              </g>
+            );
+          })}
+        </svg>
 
-      {graph.nodes
-        .filter((node) => layout.positions.has(node.id))
-        .map((node) => {
-          const pos = layout.positions.get(node.id)!;
-          const size = layout.sizes.get(node.id)!;
-          const selected = selection.kind === "node" && selection.id === node.id;
-          const isFocus = node.id === focusId;
-          const style = {
-            left: pos.x - size.w / 2,
-            top: pos.y - size.h / 2,
-            width: size.w,
-            height: size.h,
-          };
-          // El nodo queda opaco (tapa las líneas que pasan detrás); lo que se atenúa es su contenido.
-          const dim = !isFocus && !view.highlightNodes.has(node.id);
-          const className = nodeClass(node, isFocus, selected);
-          const inner = isFocus ? <FocusContent node={node} /> : node.kind === "book" ? <BookContent node={node} /> : <CardContent node={node} />;
-          const content = <span className={`contents transition-opacity ${dim ? "[&>*]:opacity-45" : ""}`}>{inner}</span>;
-          return interactive ? (
-            <button
-              key={node.id}
-              type="button"
-              aria-pressed={selected}
-              aria-label={`${node.label}${node.isClue ? " (tu pista)" : ""}`}
-              onClick={() => onSelect(selected ? { kind: "path" } : { kind: "node", id: node.id })}
-              className={`${className} transition-[opacity,box-shadow] duration-200`}
-              style={style}>
-              {content}
-            </button>
-          ) : (
-            <div key={node.id} className={className} style={style}>
-              {content}
-            </div>
-          );
-        })}
+        {graph.nodes
+          .filter((node) => layout.positions.has(node.id))
+          .map((node) => {
+            const pos = layout.positions.get(node.id)!;
+            const size = layout.sizes.get(node.id)!;
+            const selected = selection.kind === "node" && selection.id === node.id;
+            const isFocus = node.id === focusId;
+            const style = {
+              left: pos.x - size.w / 2,
+              top: pos.y - size.h / 2,
+              width: size.w,
+              height: size.h,
+            };
+            // El nodo queda opaco (tapa las líneas que pasan detrás); lo que se atenúa es su contenido.
+            const dim = !isFocus && !view.highlightNodes.has(node.id);
+            const className = nodeClass(node, isFocus, selected);
+            const inner = isFocus ? <FocusContent node={node} /> : node.kind === "book" ? <BookContent node={node} /> : <CardContent node={node} />;
+            const content = <span className={`contents transition-opacity ${dim ? "[&>*]:opacity-45" : ""}`}>{inner}</span>;
+            return interactive ? (
+              <button
+                key={node.id}
+                type="button"
+                aria-pressed={selected}
+                aria-label={`${node.label}${node.isClue ? " (tu pista)" : ""}`}
+                onClick={() => onSelect(selected ? { kind: "path" } : { kind: "node", id: node.id })}
+                className={`${className} transition-[opacity,box-shadow] duration-200`}
+                style={style}>
+                {content}
+              </button>
+            ) : (
+              <div key={node.id} className={className} style={style}>
+                {content}
+              </div>
+            );
+          })}
 
-      {showSteps &&
-        view.steps.map((step, i) => {
-          const found = edges.find((e) => e.edge.id === step.id);
-          if (!found) return null;
-          return (
-            <div
-              key={step.id}
-              aria-hidden="true"
-              className="animate-fade pointer-events-none absolute flex size-[22px] items-center justify-center rounded-full bg-accent text-[11px] font-semibold text-accent-ink shadow-[0_0_0_3px_var(--surface)]"
-              style={{ left: Math.round(found.mid.x - 11), top: Math.round(found.mid.y - 11) }}>
-              {i + 1}
-            </div>
-          );
-        })}
+        {showSteps &&
+          view.steps.map((step, i) => {
+            const found = edges.find((e) => e.edge.id === step.id);
+            if (!found) return null;
+            return (
+              <div
+                key={step.id}
+                aria-hidden="true"
+                className="animate-fade pointer-events-none absolute flex size-[22px] items-center justify-center rounded-full bg-accent text-[11px] font-semibold text-accent-ink shadow-[0_0_0_3px_var(--surface)]"
+                style={{ left: Math.round(found.mid.x - 11), top: Math.round(found.mid.y - 11) }}>
+                {i + 1}
+              </div>
+            );
+          })}
+      </div>
     </div>
   );
 }

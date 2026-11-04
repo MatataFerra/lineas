@@ -1,4 +1,5 @@
 import { edgeGeometry, layoutGraph, DEFAULT_LAYOUT, type EdgeGeometry, type GraphLayout } from "@/lib/graph/layout";
+import { connectionDetail } from "@/lib/graph/connection-detail";
 import { indexGraph, pathEdges, type GraphIndex } from "@/lib/graph/queries";
 import type { ConnectionGraph, EdgeType, GraphEdge, Recommendation } from "@/lib/graph/schema";
 
@@ -42,7 +43,9 @@ export function viewState(
   let highlightNodes: Set<string>;
   let highlightEdges: Set<string>;
   if (selection.kind === "node") {
-    const incident = index.edgesByNode.get(selection.id) ?? [];
+    // Un libro se ilumina con el camino que lo une a las pistas, además de sus aristas directas.
+    const route = connectionDetail(graph, selection.id)?.route.map((s) => s.edge) ?? [];
+    const incident = [...(index.edgesByNode.get(selection.id) ?? []), ...route];
     highlightEdges = new Set(incident.map((e) => e.id));
     highlightNodes = new Set([selection.id, ...incident.flatMap((e) => [e.source, e.target])]);
   } else if (selection.kind === "edge") {

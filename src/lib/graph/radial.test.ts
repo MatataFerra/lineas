@@ -44,6 +44,15 @@ describe("radialLayout", () => {
     }
   });
 
+  it("entra en un ancho más chico sin superponer ni salirse", () => {
+    const narrow = radialLayout(MOCK_GRAPH.nodes, "los-detectives-salvajes", visible, 680);
+    for (const [id, p] of narrow.positions) {
+      const s = narrow.sizes.get(id)!;
+      expect(p.x - s.w / 2, id).toBeGreaterThanOrEqual(0);
+      expect(p.x + s.w / 2, id).toBeLessThanOrEqual(680);
+    }
+  });
+
   it("ubica solo los nodos visibles", () => {
     const few = radialLayout(MOCK_GRAPH.nodes, "rayuela", new Set(["rayuela", "on-the-road", "charlie-parker"]));
     expect([...few.positions.keys()].sort()).toEqual(["charlie-parker", "on-the-road", "rayuela"]);
@@ -55,6 +64,12 @@ describe("radialEdge", () => {
     const center = { x: 450, y: 270 };
     const { mid } = radialEdge({ x: 100, y: 250 }, { x: 800, y: 250 }, center);
     expect(Math.abs(mid.y - center.y)).toBeGreaterThan(RADIAL.focus / 2 + 30);
+  });
+
+  it("rodea el centro también cuando la arista es casi vertical", () => {
+    const center = { x: 450, y: 270 };
+    const { mid } = radialEdge({ x: 390, y: 500 }, { x: 460, y: 70 }, center);
+    expect(Math.hypot(mid.x - center.x, mid.y - center.y)).toBeGreaterThan(RADIAL.focus / 2 + 30);
   });
 
   it("va directo cuando la arista sale del centro", () => {

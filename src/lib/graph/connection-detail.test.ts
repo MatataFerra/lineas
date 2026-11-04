@@ -40,4 +40,18 @@ describe("connectionDetail", () => {
     expect(connectionDetail(MOCK_GRAPH, "charlie-parker")).toBeNull();
     expect(connectionDetail(MOCK_GRAPH, "no-existe")).toBeNull();
   });
+
+  it("arma el recorrido desde las pistas: el de la recomendación si lo es", () => {
+    const d = connectionDetail(MOCK_GRAPH, "los-detectives-salvajes")!;
+    expect(d.route.map((s) => s.from.id)).toEqual(["generacion-beat", "arthur-rimbaud"]);
+    expect(d.route.at(-1)!.to.id).toBe("los-detectives-salvajes");
+    expect(d.route[0].edge.id).toBe("rimbaud-beat");
+  });
+
+  it("si no es una recomendación, el camino más corto desde una pista", () => {
+    const d = connectionDetail(MOCK_GRAPH, "on-the-road")!;
+    expect(d.route).toEqual([]); // es una pista: no hay camino que recorrer
+    const n = connectionDetail({ ...MOCK_GRAPH, recommendations: MOCK_GRAPH.recommendations.filter((r) => r.nodeId !== "rayuela") }, "rayuela")!;
+    expect(n.route.map((s) => s.to.id)).toEqual(["charlie-parker", "rayuela"]);
+  });
 });

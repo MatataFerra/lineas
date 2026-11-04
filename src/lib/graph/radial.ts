@@ -27,10 +27,12 @@ export interface RadialLayout {
   sizes: Map<string, { w: number; h: number }>;
 }
 
-export function radialLayout(nodes: GraphNode[], focusId: string, visible: ReadonlySet<string>): RadialLayout {
+/** `width`: el ancho disponible; el arco y la fila de libros se acomodan a él. */
+export function radialLayout(nodes: GraphNode[], focusId: string, visible: ReadonlySet<string>, width: number = RADIAL.width): RadialLayout {
   const positions = new Map<string, { x: number; y: number }>();
   const sizes = new Map<string, { w: number; h: number }>();
-  const cx = RADIAL.width / 2;
+  const cx = width / 2;
+  const rx = Math.min(RADIAL.arc.rx, cx - RADIAL.card.w / 2 - 12);
   const shown = nodes.filter((n) => visible.has(n.id));
   const byYear = (a: GraphNode, b: GraphNode) => yearOf(a) - yearOf(b);
 
@@ -45,7 +47,7 @@ export function radialLayout(nodes: GraphNode[], focusId: string, visible: Reado
     const angle = Math.PI * (1 + 0.08 + t * 0.84); // de ~194° a ~346°: la mitad de arriba
     const inner = twoRows && i % 2 === 1;
     positions.set(node.id, {
-      x: Math.round(cx + Math.cos(angle) * RADIAL.arc.rx * (inner ? 0.78 : 1)),
+      x: Math.round(cx + Math.cos(angle) * rx * (inner ? 0.78 : 1)),
       y: Math.round(RADIAL.centerY + Math.sin(angle) * RADIAL.arc.ry * (inner ? 0.62 : 1)),
     });
     sizes.set(node.id, RADIAL.card);
@@ -53,14 +55,14 @@ export function radialLayout(nodes: GraphNode[], focusId: string, visible: Reado
 
   // Abajo: los libros en fila, centrados.
   const books = shown.filter((n) => n.id !== focusId && n.kind === "book").sort(byYear);
-  const step = Math.min(RADIAL.book.w + RADIAL.gap * 2, (RADIAL.width - 40) / Math.max(books.length, 1));
+  const step = Math.min(RADIAL.book.w + RADIAL.gap * 2, (width - 40) / Math.max(books.length, 1));
   const start = cx - (step * (books.length - 1)) / 2;
   books.forEach((node, i) => {
     positions.set(node.id, { x: Math.round(start + step * i), y: RADIAL.bookRowY });
     sizes.set(node.id, { w: Math.min(RADIAL.book.w, step - RADIAL.gap), h: RADIAL.book.h });
   });
 
-  return { width: RADIAL.width, height: RADIAL.height, positions, sizes };
+  return { width, height: RADIAL.height, positions, sizes };
 }
 
 /**
@@ -75,10 +77,14 @@ export function radialEdge(a: { x: number; y: number }, b: { x: number; y: numbe
   const touchesCenter = (a.x === center.x && a.y === center.y) || (b.x === center.x && b.y === center.y);
 
   let apex: { x: number; y: number };
-  if (!touchesCenter && distanceToSegment(center, a, b) < clearance) {
-    // Rodea el halo del lado del punto medio (arriba si es ambiguo).
-    const side = my <= center.y ? -1 : 1;
-    apex = { x: mx, y: center.y + side * (clearance + 14) };
+  const foot = closestOnSegment(center, a, b);
+  if (!touchesCenter && Math.hypot(foot.x - center.x, foot.y - center.y) < clearance) {
+    // Rodea el halo por el lado donde ya pasaba la recta (si la cruza justo al medio, por el costado de la normal).
+    let dx = foot.x - center.x;
+    let dy = foot.y - center.y;
+    if (Math.hypot(dx, dy) < 1) [dx, dy] = [-(b.y - a.y), b.x - a.x];
+    const len = Math.hypot(dx, dy) || 1;
+    apex = { x: center.x + (dx / len) * (clearance + 14), y: center.y + (dy / len) * (clearance + 14) };
   } else {
     const dx = mx - center.x;
     const dy = my - center.y;
@@ -92,9 +98,9 @@ export function radialEdge(a: { x: number; y: number }, b: { x: number; y: numbe
   return { d: `M${a.x} ${a.y} Q${qx} ${qy} ${b.x} ${b.y}`, mid: apex };
 }
 
-function distanceToSegment(p: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }): number {
+function closestOnSegment(p: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }) {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1)));
-  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+  return { x: a.x + t * dx, y: a.y + t * dy };
 }

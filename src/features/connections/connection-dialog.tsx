@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { BookCover } from "@/components/book-cover";
 import { ArrowLeftIcon, ArrowRightIcon, CloseIcon } from "@/components/icons";
 import { booksInOrder, connectionDetail } from "@/lib/graph/connection-detail";
+import { EdgeTypeBadge } from "./connection-badges";
 import type { ConnectionGraph } from "@/lib/graph/schema";
 
 interface ConnectionDialogProps {
@@ -95,6 +96,31 @@ export function ConnectionDialog({ graph, nodeId, onClose, onShowConnections }: 
           </div>
         </div>
 
+        {detail.route.length > 0 && (
+          <section aria-labelledby="route-title" className="mt-7 border-t border-line pt-5">
+            <h3 id="route-title" className="font-serif text-[17px]">
+              Cómo llegamos acá
+            </h3>
+            <ol className="mt-4">
+              <RouteStop label={detail.route[0].from.label} note={detail.route[0].from.isClue ? "Tu pista" : undefined} first />
+              {detail.route.map(({ to, edge }, k) => (
+                <li key={edge.id} className="contents">
+                  <div className="flex gap-3.5">
+                    <span aria-hidden="true" className="flex w-3 justify-center">
+                      <span className="w-px bg-accent/60" />
+                    </span>
+                    <div className="py-2.5">
+                      <EdgeTypeBadge type={edge.type} />
+                      <p className="mt-1.5 max-w-[56ch] text-[13px] leading-snug text-muted">{edge.summary}</p>
+                    </div>
+                  </div>
+                  <RouteStop label={to.label} last={k === detail.route.length - 1} />
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
+
         {detail.related.length > 0 && (
           <section aria-labelledby="related-title" className="mt-7 border-t border-line pt-5">
             <h3 id="related-title" className="font-serif text-[17px]">
@@ -139,5 +165,18 @@ export function ConnectionDialog({ graph, nodeId, onClose, onShowConnections }: 
         </div>
       </div>
     </dialog>
+  );
+}
+
+function RouteStop({ label, note, first, last }: { label: string; note?: string; first?: boolean; last?: boolean }) {
+  const Tag = first ? "li" : "div";
+  return (
+    <Tag className="flex items-center gap-3.5">
+      <span aria-hidden="true" className="flex w-3 justify-center">
+        <span className={`rounded-full ${last ? "size-3 bg-accent" : first ? "size-2.5 bg-ink" : "size-2.5 border border-edge bg-surface"}`} />
+      </span>
+      <span className={`font-serif leading-tight ${last ? "text-[16px]" : "text-[15px]"}`}>{label}</span>
+      {note && <span className="text-[11px] text-muted">{note}</span>}
+    </Tag>
   );
 }

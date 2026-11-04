@@ -47,12 +47,6 @@ export function ConnectionsScreen() {
     [model, rec, selection, maxHops, hiddenTypes],
   );
 
-  // En el mapa, un libro abre «La conexión»; personas, movimientos e ideas se ven en el panel.
-  const selectOnMap = (next: Selection) => {
-    if (next.kind === "node" && model?.index.nodes.get(next.id)?.kind === "book") setOpenBook(next.id);
-    else setSelection(next);
-  };
-
   const choose = (r: Recommendation) => {
     setFocus(r.nodeId);
     setSelection({ kind: "path" });
@@ -115,8 +109,8 @@ export function ConnectionsScreen() {
             {/* Desktop: grafo + panel */}
             <div className="mt-[18px] hidden items-start gap-5 lg:flex">
               <section aria-label="Mapa" className="min-w-0 flex-[999_1_640px] overflow-hidden rounded-2xl border border-line bg-surface">
-                <div className="overflow-x-auto pt-2">
-                  <GraphCanvas model={model} view={view} selection={selection} onSelect={selectOnMap} />
+                <div className="px-3 pt-2">
+                  <GraphCanvas model={model} view={view} selection={selection} onSelect={setSelection} />
                 </div>
                 <MapControls
                   maxHops={maxHops}
@@ -137,7 +131,7 @@ export function ConnectionsScreen() {
                 </p>
               </section>
               <aside className="max-w-[360px] min-w-[300px] flex-[1_1_320px] rounded-2xl border border-line bg-surface p-[22px]">
-                <PathPanel model={model} view={view} selection={selection} onSelect={setSelection} laneDot={LANE_DOT[rec.lane]} />
+                <PathPanel model={model} view={view} selection={selection} onSelect={setSelection} onOpenBook={setOpenBook} laneDot={LANE_DOT[rec.lane]} />
               </aside>
             </div>
 
