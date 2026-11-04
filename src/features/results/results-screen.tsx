@@ -8,7 +8,7 @@ import { SiteHeader } from "@/components/site-header";
 import { VoteControl } from "@/components/vote-control";
 import { LANE_META, LANE_ORDER } from "@/lib/graph/labels";
 import { recommendedBook } from "@/lib/graph/merge";
-import type { Clue, Lane } from "@/lib/graph/schema";
+import type { Lane } from "@/lib/graph/schema";
 import { bookSnapshot, useLineas, type LaneState } from "@/lib/store";
 import { LibraryNotice } from "@/features/library/library-notice";
 
@@ -95,7 +95,7 @@ export function ResultsScreen() {
             <div className="mt-5 grid gap-6 md:mt-9 md:grid-cols-3">
               {LANE_ORDER.map((lane) => (
                 <div key={lane} className={lane === shownLane ? "" : "hidden md:block"}>
-                  <LaneSlot lane={lane} state={lanes[lane]} clues={clues} />
+                  <LaneSlot lane={lane} state={lanes[lane]} />
                 </div>
               ))}
             </div>
@@ -141,7 +141,7 @@ const WAITING_COPY: Record<Lane, () => string> = {
   beyond: () => "Buscando un puente que no esperabas.",
 };
 
-function LaneSlot({ lane, state, clues }: { lane: Lane; state: LaneState; clues: Clue[] }) {
+function LaneSlot({ lane, state }: { lane: Lane; state: LaneState }) {
   const meta = LANE_META[lane];
   const graph = state.options[state.index];
 
@@ -162,7 +162,7 @@ function LaneSlot({ lane, state, clues }: { lane: Lane; state: LaneState; clues:
       </div>
       <p className="mt-1.5 text-xs leading-snug text-muted">{meta.hint}</p>
 
-      {state.status === "pending" && <Waiting lane={lane} from={clues[0]?.label ?? "tus pistas"} />}
+      {state.status === "pending" && <Waiting lane={lane} />}
       {state.status === "error" && <LaneError lane={lane} message={state.error} />}
       {state.status === "ready" && graph && <LaneCard lane={lane} state={state} />}
     </article>
@@ -179,7 +179,7 @@ const TRACES: Record<Lane, { d: string; bridge?: [number, number] }> = {
   beyond: { d: "M30 30 C 52 84, 128 2, 166 40 C 196 70, 112 60, 100 96", bridge: [166, 40] },
 };
 
-function Waiting({ lane, from }: { lane: Lane; from: string }) {
+function Waiting({ lane }: { lane: Lane }) {
   const trace = TRACES[lane];
   return (
     <div className="flex flex-1 flex-col" role="status">
@@ -203,10 +203,7 @@ function Waiting({ lane, from }: { lane: Lane; from: string }) {
         <rect x="62" y="96" width="76" height="112" rx="3" fill="none" stroke="var(--edge)" strokeWidth="1.2" strokeDasharray="4 4" className="animate-land" />
         <circle cx="100" cy="96" r="2.5" fill="var(--accent)" className="animate-land" />
       </svg>
-      <p className="mt-2 text-[13px] leading-snug">
-        Trazando el camino desde <span className="font-serif text-[15px] italic">{from}</span>
-      </p>
-      <p className="mt-1 text-xs leading-snug text-muted">{WAITING_COPY[lane]()}</p>
+      <p className="mt-2 font-serif text-[16px] leading-snug">{WAITING_COPY[lane]()}</p>
     </div>
   );
 }
