@@ -10,6 +10,7 @@ import { LANE_META, LANE_ORDER } from "@/lib/graph/labels";
 import { recommendedBook } from "@/lib/graph/merge";
 import type { Lane } from "@/lib/graph/schema";
 import { bookSnapshot, useLineas, type LaneState } from "@/lib/store";
+import { LaneTrace } from "./lane-trace";
 import { LibraryNotice } from "@/features/library/library-notice";
 
 export function ResultsScreen() {
@@ -169,40 +170,10 @@ function LaneSlot({ lane, state }: { lane: Lane; state: LaneState }) {
   );
 }
 
-/**
- * Mientras el carril espera, se dibuja su recorrido: directo en afinidad, con
- * un desvío en alternativo y pasando por un puente en «fuera de tu mapa».
- */
-const TRACES: Record<Lane, { d: string; bridge?: [number, number] }> = {
-  affinity: { d: "M30 30 C 58 30, 100 48, 100 96" },
-  alternative: { d: "M30 30 C 118 14, 182 44, 156 72 C 138 90, 104 74, 100 96" },
-  beyond: { d: "M30 30 C 52 84, 128 2, 166 40 C 196 70, 112 60, 100 96", bridge: [166, 40] },
-};
-
 function Waiting({ lane }: { lane: Lane }) {
-  const trace = TRACES[lane];
   return (
     <div className="flex flex-1 flex-col" role="status">
-      <svg viewBox="0 0 200 220" aria-hidden="true" className="mx-auto mt-4 h-60 w-full max-w-60 text-ink">
-        {/* El camino completo, tenue: se ve adónde va antes de que la línea llegue. */}
-        <path d={trace.d} fill="none" stroke="var(--line)" strokeWidth="1.2" strokeDasharray="2 4" strokeLinecap="round" />
-        <path
-          d={trace.d}
-          fill="none"
-          stroke="var(--accent)"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          // Largo normalizado: la línea siempre llega al final, sea cual sea la curva.
-          pathLength={100}
-          strokeDasharray={100}
-          className="animate-trace"
-          style={{ ["--trace-length" as string]: "100" }}
-        />
-        <circle cx="30" cy="30" r="4.5" fill="currentColor" />
-        {trace.bridge && <circle cx={trace.bridge[0]} cy={trace.bridge[1]} r="4.5" fill="var(--surface)" stroke="var(--edge)" strokeWidth="1.4" />}
-        <rect x="62" y="96" width="76" height="112" rx="3" fill="none" stroke="var(--edge)" strokeWidth="1.2" strokeDasharray="4 4" className="animate-land" />
-        <circle cx="100" cy="96" r="2.5" fill="var(--accent)" className="animate-land" />
-      </svg>
+      <LaneTrace lane={lane} />
       <p className="mt-2 font-serif text-[16px] leading-snug">{WAITING_COPY[lane]()}</p>
     </div>
   );

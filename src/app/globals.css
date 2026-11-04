@@ -114,34 +114,6 @@ dialog::backdrop {
   }
 }
 
-/* El recorrido que se dibuja mientras un carril espera: la línea avanza desde la pista. */
-@keyframes lineas-trace {
-  0% {
-    stroke-dashoffset: var(--trace-length);
-  }
-  70%,
-  100% {
-    stroke-dashoffset: 0;
-  }
-}
-@keyframes lineas-land {
-  0%,
-  60% {
-    opacity: 0.25;
-  }
-  85%,
-  100% {
-    opacity: 1;
-  }
-}
-
-@utility animate-trace {
-  animation: lineas-trace 2.6s cubic-bezier(0.45, 0, 0.2, 1) infinite;
-}
-@utility animate-land {
-  animation: lineas-land 2.6s ease-in-out infinite;
-}
-
 @utility animate-fade {
   animation: lineas-fade 0.3s ease;
 }
