@@ -1,13 +1,28 @@
 "use client";
 
 import { create } from "zustand";
-import { ConnectionGraphSchema, type Clue, type ClueKind, type ConnectionGraph, type GraphNode } from "@/lib/graph/schema";
+import { authorOf, mergeLaneGraphs, recommendedBook } from "@/lib/graph/merge";
+import { LaneSchema, type Clue, type ClueKind, type ConnectionGraph, type GraphNode, type Lane } from "@/lib/graph/schema";
+import { readEventStream, type ExcludedBook, type StreamEvent } from "@/lib/recommend/events";
 import { getBrowserSupabase } from "@/lib/supabase/client";
 import type { Enums, Json } from "@/lib/supabase/database.types";
 
 export type LibraryStatus = Enums<"library_status">;
 
 type Status = "idle" | "loading" | "ready" | "error";
+
+/** Un carril: las opciones que ya llegaron ("ver otra" agrega) y cuál se muestra. */
+export interface LaneState {
+  status: "pending" | "ready" | "error";
+  options: ConnectionGraph[];
+  index: number;
+  /** Se está pidiendo otra opción para este carril. */
+  loadingMore: boolean;
+  error: string | null;
+}
+
+const emptyLane = (): LaneState => ({ status: "pending", options: [], index: 0, loadingMore: false, error: null });
+const emptyLanes = (): Record<Lane, LaneState> => ({ affinity: emptyLane(), alternative: emptyLane(), beyond: emptyLane() });
 
 export interface SessionUser {
   id: string;
@@ -39,7 +54,11 @@ export interface LibraryEntry extends BookSnapshot {
 
 interface LineasState {
   clues: Clue[];
+  /** Los carriles, cada uno llega por su cuenta. */
+  lanes: Record<Lane, LaneState>;
+  /** El mapa visible: la unión del libro que se muestra en cada carril. */
   graph: ConnectionGraph | null;
+  /** "ready" apenas llega el primer carril. */
   status: Status;
   error: string | null;
   /** Firma de las pistas con las que se armó `graph`. */
@@ -58,7 +77,10 @@ interface LineasState {
   addClue: (label: string, kind: ClueKind) => void;
   toggleClue: (label: string, kind: ClueKind) => void;
   removeClue: (id: string) => void;
-  search: () => Promise<void>;
+  search: (options?: { force?: boolean }) => Promise<void>;
+  /** "No es lo que busco · ver otra": la siguiente opción del carril, o una nueva. */
+  showAnother: (lane: Lane) => Promise<void>;
+  retryLane: (lane: Lane) => Promise<void>;
   setFocus: (nodeId: string | null) => void;
 
   isIn: (bookId: string, status: LibraryStatus) => boolean;
@@ -86,8 +108,12 @@ function withStatus(library: Record<string, LibraryEntry>, book: BookSnapshot, s
   return next;
 }
 
+/** La búsqueda en curso: si cambian las pistas, se corta. */
+let searchAbort: AbortController | null = null;
+
 export const useLineas = create<LineasState>()((set, get) => ({
   clues: INITIAL_CLUES,
+  lanes: emptyLanes(),
   graph: null,
   status: "idle",
   error: null,
@@ -114,39 +140,66 @@ export const useLineas = create<LineasState>()((set, get) => ({
 
   removeClue: (id) => set((s) => ({ clues: s.clues.filter((c) => c.id !== id) })),
 
-  search: async () => {
+  search: async ({ force = false } = {}) => {
     const { clues, graphKey, status } = get();
     const key = keyOf(clues);
-    if (key === graphKey && status === "ready") return;
+    // Misma búsqueda ya lista o en camino (por ejemplo, al pasar de resultados al mapa).
+    if (!force && key === graphKey && (status === "ready" || status === "loading")) return;
     if (clues.length === 0) {
       set({ status: "error", error: "Agregá al menos una pista para empezar." });
       return;
     }
 
-    set({ status: "loading", error: null });
-    try {
-      const response = await fetch("/api/recommend", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ clues }),
+    searchAbort?.abort();
+    const abort = new AbortController();
+    searchAbort = abort;
+    set({ status: "loading", error: null, graphKey: key, lanes: emptyLanes(), graph: null, focus: null });
+
+    const applyEvent = (event: StreamEvent) => {
+      if (event.type === "done") return;
+      set((s) => {
+        const lanes = { ...s.lanes };
+        const lane = { ...lanes[event.lane] };
+        if (event.type === "lane") Object.assign(lane, { status: "ready", options: [...lane.options, event.graph], index: lane.options.length, error: null });
+        if (event.type === "patch") lane.options = lane.options.map((g) => patchBook(g, event.nodeId, event.book));
+        if (event.type === "lane-error") Object.assign(lane, lane.options.length ? { error: event.message } : { status: "error", error: event.message });
+        lanes[event.lane] = lane;
+        const graph = visibleGraph(s.clues, lanes);
+        return { lanes, graph, status: graph ? "ready" : s.status };
       });
-      const body: unknown = await response.json();
-      if (!response.ok) {
-        const message = typeof body === "object" && body && "error" in body ? String(body.error) : "Algo salió mal.";
-        throw new Error(message);
-      }
-      // El servidor ya valida, pero el cliente no confía a ciegas en la red.
-      const graph = ConnectionGraphSchema.parse(body);
-      // Ignorar la respuesta si mientras tanto cambiaron las pistas.
-      if (keyOf(get().clues) !== key) {
-        set({ status: "idle" });
+    };
+
+    try {
+      await streamRecommendations({ clues }, abort.signal, applyEvent);
+      if (abort.signal.aborted) return;
+      const { graph, lanes } = get();
+      // Lo que no llegó se marca como error para poder reintentarlo.
+      set({ lanes: settleLanes(lanes) });
+      if (!graph) {
+        set({ status: "error", error: "No pudimos armar las recomendaciones. Probá de nuevo en un momento." });
         return;
       }
-      set({ graph, graphKey: key, status: "ready", focus: null });
       void saveSearch(get().user, clues, graph);
     } catch (error) {
-      set({ status: "error", error: error instanceof Error ? error.message : "Algo salió mal." });
+      if (abort.signal.aborted) return;
+      if (get().graph) set({ lanes: settleLanes(get().lanes) });
+      else set({ status: "error", error: error instanceof Error ? error.message : "Algo salió mal." });
     }
+  },
+
+  showAnother: async (lane) => {
+    const state = get().lanes[lane];
+    if (state.loadingMore || state.status !== "ready") return;
+    if (state.index + 1 < state.options.length) {
+      setLane(set, get, lane, { index: state.index + 1, error: null });
+      return;
+    }
+    await requestLane(set, get, lane);
+  },
+
+  retryLane: async (lane) => {
+    setLane(set, get, lane, { status: "pending", error: null });
+    await requestLane(set, get, lane);
   },
 
   setFocus: (focus) => set({ focus }),
@@ -218,6 +271,83 @@ export const useLineas = create<LineasState>()((set, get) => ({
     set({ library, libraryError: null });
   },
 }));
+
+type Set = (partial: Partial<LineasState> | ((s: LineasState) => Partial<LineasState>)) => void;
+type Get = () => LineasState;
+
+function setLane(set: Set, get: Get, lane: Lane, patch: Partial<LaneState>) {
+  set((s) => {
+    const lanes = { ...s.lanes, [lane]: { ...s.lanes[lane], ...patch } };
+    return { lanes, graph: visibleGraph(s.clues, lanes) ?? s.graph };
+  });
+}
+
+/** Pide una opción nueva para un carril, excluyendo todo lo que ya se mostró. */
+async function requestLane(set: Set, get: Get, lane: Lane) {
+  const { clues, graphKey, lanes } = get();
+  const exclude: ExcludedBook[] = LaneSchema.options.flatMap((l) =>
+    lanes[l].options.flatMap((g) => {
+      const book = recommendedBook(g);
+      return book ? [{ title: book.label, author: authorOf(book) }] : [];
+    }),
+  );
+  setLane(set, get, lane, { loadingMore: true, error: null });
+  let arrived = false;
+  try {
+    await streamRecommendations({ clues, lane, exclude }, searchAbort?.signal, (event) => {
+      if (get().graphKey !== graphKey || event.type === "done" || event.lane !== lane) return;
+      const current = get().lanes[lane];
+      if (event.type === "lane") {
+        arrived = true;
+        setLane(set, get, lane, { status: "ready", options: [...current.options, event.graph], index: current.options.length });
+      }
+      if (event.type === "patch") setLane(set, get, lane, { options: current.options.map((g) => patchBook(g, event.nodeId, event.book)) });
+      if (event.type === "lane-error") setLane(set, get, lane, current.options.length ? { error: event.message } : { status: "error", error: event.message });
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Algo salió mal.";
+    setLane(set, get, lane, get().lanes[lane].options.length ? { error: message } : { status: "error", error: message });
+  } finally {
+    if (get().graphKey === graphKey) {
+      const current = get().lanes[lane];
+      setLane(set, get, lane, {
+        loadingMore: false,
+        ...(!arrived && !current.error ? (current.options.length ? { error: "No encontramos otro libro para este camino." } : { status: "error" as const, error: "No pudimos armar este camino." }) : {}),
+      });
+    }
+  }
+}
+
+/** POST /api/recommend y lectura del stream. Los errores antes del stream (400, 429) vienen como JSON. */
+async function streamRecommendations(body: { clues: Clue[]; lane?: Lane; exclude?: ExcludedBook[] }, signal: AbortSignal | undefined, onEvent: (event: StreamEvent) => void) {
+  const response = await fetch("/api/recommend", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!response.ok || !response.body) {
+    const data: unknown = await response.json().catch(() => null);
+    throw new Error(typeof data === "object" && data && "error" in data ? String(data.error) : "Algo salió mal.");
+  }
+  // El servidor ya valida, pero el cliente no confía a ciegas en la red: cada evento se valida al leerlo.
+  await readEventStream(response.body, onEvent);
+}
+
+function visibleGraph(clues: Clue[], lanes: Record<Lane, LaneState>): ConnectionGraph | null {
+  const parts = LaneSchema.options.flatMap((l) => (lanes[l].options[lanes[l].index] ? [lanes[l].options[lanes[l].index]] : []));
+  return parts.length ? mergeLaneGraphs(clues, parts) : null;
+}
+
+function settleLanes(lanes: Record<Lane, LaneState>): Record<Lane, LaneState> {
+  const next = { ...lanes };
+  for (const l of LaneSchema.options) if (next[l].status === "pending") next[l] = { ...next[l], status: "error", error: next[l].error ?? "No pudimos armar este camino." };
+  return next;
+}
+
+function patchBook(graph: ConnectionGraph, nodeId: string, book: NonNullable<GraphNode["book"]>): ConnectionGraph {
+  return { ...graph, nodes: graph.nodes.map((n) => (n.id === nodeId ? { ...n, book } : n)) };
+}
 
 async function saveSearch(user: SessionUser | null, clues: Clue[], graph: ConnectionGraph) {
   const supabase = getBrowserSupabase();
