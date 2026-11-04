@@ -8,8 +8,11 @@ import { SiteHeader } from "@/components/site-header";
 import { VoteControl } from "@/components/vote-control";
 import { LANE_META, LANE_ORDER } from "@/lib/graph/labels";
 import { recommendedBook } from "@/lib/graph/merge";
-import type { Clue, Lane } from "@/lib/graph/schema";
+import type { Lane } from "@/lib/graph/schema";
 import { bookSnapshot, useLineas, type LaneState } from "@/lib/store";
+import { NoClues } from "@/components/no-clues";
+import { authorHref } from "@/lib/authors/link";
+import { LaneSearch } from "./lane-search";
 import { LibraryNotice } from "@/features/library/library-notice";
 
 export function ResultsScreen() {
@@ -17,6 +20,7 @@ export function ResultsScreen() {
   const lanes = useLineas((s) => s.lanes);
   const status = useLineas((s) => s.status);
   const error = useLineas((s) => s.error);
+  const errorNeedsEdit = useLineas((s) => s.errorNeedsEdit);
   const search = useLineas((s) => s.search);
 
   // Si se entra directo a /resultados (o cambiaron las pistas), buscar.
@@ -29,6 +33,17 @@ export function ResultsScreen() {
   const firstReady = LANE_ORDER.find((l) => lanes[l].status === "ready");
   const shownLane = mobileLane ?? firstReady ?? "affinity";
 
+  if (clues.length === 0) {
+    return (
+      <div className="min-h-dvh px-5.5 pt-5 pb-12 md:px-14 md:pt-7">
+        <div className="mx-auto max-w-290">
+          <SiteHeader />
+          <NoClues />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-dvh px-5.5 pt-5 pb-12 md:px-14 md:pt-7">
       <div className="mx-auto max-w-290">
@@ -36,7 +51,7 @@ export function ResultsScreen() {
 
         <Link
           href="/"
-          className="mt-5 inline-flex items-center gap-2 py-2 text-[13px] text-muted hover:text-ink md:mt-7">
+          className="mt-5 inline-flex items-center gap-2 py-2 mb-4 text-[13px] text-muted hover:text-ink md:mb-8 md:mt-7">
           <ArrowLeftIcon size={14} />
           Volver
         </Link>
@@ -62,12 +77,18 @@ export function ResultsScreen() {
         {status === "error" && (
           <div role="alert" className="mt-9 rounded-2xl border border-line bg-surface p-6">
             <p className="text-sm">{error}</p>
-            <button
-              type="button"
-              onClick={() => void search({ force: true })}
-              className="mt-4 h-10 rounded-full bg-ink px-5 text-[13px] text-bg">
-              Reintentar
-            </button>
+            {errorNeedsEdit ? (
+              <Link href="/" className="mt-4 inline-flex h-10 items-center rounded-full bg-ink px-5 text-[13px] text-bg">
+                Editar pistas
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void search({ force: true })}
+                className="mt-4 h-10 rounded-full bg-ink px-5 text-[13px] text-bg">
+                Reintentar
+              </button>
+            )}
           </div>
         )}
 
@@ -95,7 +116,7 @@ export function ResultsScreen() {
             <div className="mt-5 grid gap-6 md:mt-9 md:grid-cols-3">
               {LANE_ORDER.map((lane) => (
                 <div key={lane} className={lane === shownLane ? "" : "hidden md:block"}>
-                  <LaneSlot lane={lane} state={lanes[lane]} clues={clues} />
+                  <LaneSlot lane={lane} state={lanes[lane]} />
                 </div>
               ))}
             </div>
@@ -141,7 +162,7 @@ const WAITING_COPY: Record<Lane, () => string> = {
   beyond: () => "Buscando un puente que no esperabas.",
 };
 
-function LaneSlot({ lane, state, clues }: { lane: Lane; state: LaneState; clues: Clue[] }) {
+function LaneSlot({ lane, state }: { lane: Lane; state: LaneState }) {
   const meta = LANE_META[lane];
   const graph = state.options[state.index];
 
@@ -162,46 +183,18 @@ function LaneSlot({ lane, state, clues }: { lane: Lane; state: LaneState; clues:
       </div>
       <p className="mt-1.5 text-xs leading-snug text-muted">{meta.hint}</p>
 
-      {state.status === "pending" && <Waiting lane={lane} from={clues[0]?.label ?? "tus pistas"} />}
+      {state.status === "pending" && <Waiting lane={lane} />}
       {state.status === "error" && <LaneError lane={lane} message={state.error} />}
       {state.status === "ready" && graph && <LaneCard lane={lane} state={state} />}
     </article>
   );
 }
 
-/**
- * Mientras el carril espera, se dibuja su recorrido: directo en afinidad, con
- * un desvío en alternativo y pasando por un puente en «fuera de tu mapa».
- */
-const TRACES: Record<Lane, { d: string; length: number; bridge?: [number, number] }> = {
-  affinity: { d: "M28 34 C 60 34, 92 52, 100 70", length: 90 },
-  alternative: { d: "M28 34 C 140 30, 170 70, 120 60 S 96 62, 100 70", length: 210 },
-  beyond: { d: "M28 34 C 20 120, 176 20, 168 110 S 110 52, 100 70", length: 330, bridge: [168, 110] },
-};
-
-function Waiting({ lane, from }: { lane: Lane; from: string }) {
-  const trace = TRACES[lane];
+function Waiting({ lane }: { lane: Lane }) {
   return (
     <div className="flex flex-1 flex-col" role="status">
-      <svg viewBox="0 0 200 230" aria-hidden="true" className="mx-auto mt-4 h-60 w-full max-w-60 text-ink">
-        <circle cx="28" cy="34" r="4.5" fill="currentColor" />
-        {trace.bridge && <circle cx={trace.bridge[0]} cy={trace.bridge[1]} r="4" fill="var(--surface)" stroke="var(--edge)" strokeWidth="1.4" />}
-        <path
-          d={trace.d}
-          fill="none"
-          stroke="var(--accent)"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeDasharray={trace.length}
-          className="animate-trace"
-          style={{ ["--trace-length" as string]: `${trace.length}px` }}
-        />
-        <rect x="62" y="70" width="76" height="112" rx="3" fill="none" stroke="var(--edge)" strokeWidth="1.2" strokeDasharray="4 4" className="animate-land" />
-      </svg>
-      <p className="mt-2 text-[13px] leading-snug">
-        Trazando el camino desde <span className="font-serif text-[15px] italic">{from}</span>
-      </p>
-      <p className="mt-1 text-xs leading-snug text-muted">{WAITING_COPY[lane]()}</p>
+      <LaneSearch lane={lane} />
+      <p className="mt-2 font-serif text-[16px] leading-snug">{WAITING_COPY[lane]()}</p>
     </div>
   );
 }
@@ -244,13 +237,22 @@ function LaneCard({ lane, state }: { lane: Lane; state: LaneState }) {
         <div className="md:hidden">
           <BookCover id={node.id} title={node.label} author={author} size="md" coverUrl={node.book?.coverUrl} />
         </div>
-        <div className="mx-auto mt-5.5 mb-5 hidden md:block">
+        <Link href={`/libro/${node.id}`} tabIndex={-1} aria-hidden="true" className="mx-auto mt-5.5 mb-5 hidden transition-transform hover:-translate-y-0.5 md:block">
           <BookCover id={node.id} title={node.label} author={author} size="lg" coverUrl={node.book?.coverUrl} />
-        </div>
+        </Link>
         <div className="min-w-0 pt-1 md:pt-0">
-          <h2 className="font-serif text-[22px] leading-[1.15] md:text-[23px]">{node.label}</h2>
+          <h2 className="font-serif text-[22px] leading-[1.15] md:text-[23px]">
+            <Link href={`/libro/${node.id}`} className="hover:underline">
+              {node.label}
+            </Link>
+          </h2>
           <p className="mt-1 text-[13px] text-muted">
-            {author} · {node.era.label}
+            {author ? (
+              <Link href={authorHref(author)} className="underline-offset-[3px] hover:text-ink hover:underline">
+                {author}
+              </Link>
+            ) : null}{" "}
+            · {node.era.label}
           </p>
           {node.book && !node.book.verified && (
             <p

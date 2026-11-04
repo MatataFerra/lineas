@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { LoginScreen } from "@/features/auth/login-screen";
+import { PageTransition } from "@/components/page-transition";
 
 function LoginWithParams() {
   const params = useSearchParams();
@@ -14,7 +15,9 @@ function LoginWithParams() {
 export default function Page() {
   return (
     <Suspense fallback={null}>
-      <LoginWithParams />
+      <PageTransition>
+        <LoginWithParams />
+      </PageTransition>
     </Suspense>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { coverColors } from "@/components/book-cover";
-import { ChevronDownIcon } from "@/components/icons";
+import { ArrowRightIcon, ChevronDownIcon } from "@/components/icons";
 import { describeTimeJump, otherEnd } from "@/lib/graph/queries";
 import { EDGE_META } from "@/lib/graph/labels";
 import { VoteControl } from "@/components/vote-control";
@@ -14,7 +14,7 @@ import type { GraphModel, ViewState } from "./model";
  * El recorrido en mobile: una línea de tiempo vertical. Cada parada se puede
  * desplegar para ver con qué más conecta dentro del mapa.
  */
-export function PathTimeline({ model, view }: { model: GraphModel; view: ViewState }) {
+export function PathTimeline({ model, view, onOpenBook }: { model: GraphModel; view: ViewState; onOpenBook: (id: string) => void }) {
   const { index } = model;
   const [open, setOpen] = useState<string | null>(null);
   const edgeVotes = useLineas((s) => s.edgeVotes);
@@ -79,6 +79,12 @@ export function PathTimeline({ model, view }: { model: GraphModel; view: ViewSta
                       <div className="mt-0.5 text-xs leading-snug text-muted">{other.summary}</div>
                     </div>
                   ))}
+                  {node.kind === "book" && (
+                    <button type="button" onClick={() => onOpenBook(id)} className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-medium underline-offset-2 hover:underline">
+                      Ver la conexión
+                      <ArrowRightIcon size={12} />
+                    </button>
+                  )}
                 </div>
               )}
 

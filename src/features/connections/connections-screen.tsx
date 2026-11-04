@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeftIcon, CloseIcon, ExpandIcon } from "@/components/icons";
+import { NoClues } from "@/components/no-clues";
 import { SiteHeader } from "@/components/site-header";
 import { EDGE_META, EDGE_ORDER, LANE_META, LANE_ORDER } from "@/lib/graph/labels";
 import { GRAPH_LIMITS, type EdgeType, type Lane, type Recommendation } from "@/lib/graph/schema";
 import { useLineas } from "@/lib/store";
+import { ConnectionDialog } from "./connection-dialog";
 import { GraphCanvas } from "./graph-canvas";
 import { MiniMap } from "./mini-map";
 import { buildModel, viewState, type GraphModel, type Selection, type ViewState } from "./model";
@@ -17,6 +19,7 @@ const LANE_DOT: Record<Lane, string> = { affinity: "var(--ink)", alternative: "v
 
 export function ConnectionsScreen() {
   const graph = useLineas((s) => s.graph);
+  const clueCount = useLineas((s) => s.clues.length);
   const status = useLineas((s) => s.status);
   const error = useLineas((s) => s.error);
   const search = useLineas((s) => s.search);
@@ -31,6 +34,7 @@ export function ConnectionsScreen() {
   const [maxHops, setMaxHops] = useState<number>(GRAPH_LIMITS.maxHops);
   const [hiddenTypes, setHiddenTypes] = useState<ReadonlySet<EdgeType>>(new Set());
   const [mapOpen, setMapOpen] = useState(false);
+  const [openBook, setOpenBook] = useState<string | null>(null);
 
   const model = useMemo(() => (graph ? buildModel(graph) : null), [graph]);
   const recs = useMemo(
@@ -55,7 +59,7 @@ export function ConnectionsScreen() {
       <div className="mx-auto max-w-[1240px]">
         <SiteHeader />
 
-        <Link href="/resultados" className="mt-5 inline-flex items-center gap-2 py-2 text-[13px] text-muted hover:text-ink lg:mt-6">
+        <Link href="/resultados" className="mt-5 inline-flex items-center gap-2 py-2 mb-4 text-[13px] text-muted hover:text-ink md:mb-8 lg:mt-6">
           <ArrowLeftIcon size={14} />
           Volver a los resultados
         </Link>
@@ -68,7 +72,9 @@ export function ConnectionsScreen() {
           </p>
         </div>
 
-        {status === "error" && (
+        {clueCount === 0 && <NoClues />}
+
+        {clueCount > 0 && status === "error" && (
           <div role="alert" className="mt-8 rounded-2xl border border-line bg-surface p-6 text-sm">
             {error}
             <button type="button" onClick={() => void search()} className="mt-4 block h-10 rounded-full bg-ink px-5 text-[13px] text-bg">
@@ -77,7 +83,7 @@ export function ConnectionsScreen() {
           </div>
         )}
 
-        {status !== "error" && (!model || !view || !rec) && <p className="animate-soft-pulse mt-8 text-[13px] text-muted">Armando el mapa…</p>}
+        {clueCount > 0 && status !== "error" && (!model || !view || !rec) && <p className="animate-soft-pulse mt-8 text-[13px] text-muted">Armando el mapa…</p>}
 
         {model && view && rec && (
           <>
@@ -107,8 +113,8 @@ export function ConnectionsScreen() {
             {/* Desktop: grafo + panel */}
             <div className="mt-[18px] hidden items-start gap-5 lg:flex">
               <section aria-label="Mapa" className="min-w-0 flex-[999_1_640px] overflow-hidden rounded-2xl border border-line bg-surface">
-                <div className="overflow-x-auto pt-2">
-                  <GraphCanvas model={model} view={view} selection={selection} onSelect={setSelection} />
+                <div className="px-3 pt-2">
+                  <GraphCanvas nodes={model.graph.nodes} focusId={view.rec.nodeId} view={view} selection={selection} onSelect={setSelection} />
                 </div>
                 <MapControls
                   maxHops={maxHops}
@@ -124,12 +130,12 @@ export function ConnectionsScreen() {
                   }
                 />
                 <p className="px-4 pb-3.5 text-[11px] text-muted">
-                  {view.visibleNodes.size} de {model.graph.nodes.length} nodos · hasta {maxHops} {maxHops === 1 ? "salto" : "saltos"} desde tus pistas · el eje del
-                  tiempo se estira donde hay más conexiones
+                  {view.visibleNodes.size} de {model.graph.nodes.length} nodos · hasta {maxHops} {maxHops === 1 ? "salto" : "saltos"} desde tus pistas · de lo más antiguo, a
+                  la izquierda, a lo más nuevo
                 </p>
               </section>
               <aside className="max-w-[360px] min-w-[300px] flex-[1_1_320px] rounded-2xl border border-line bg-surface p-[22px]">
-                <PathPanel model={model} view={view} selection={selection} onSelect={setSelection} laneDot={LANE_DOT[rec.lane]} />
+                <PathPanel model={model} view={view} selection={selection} onSelect={setSelection} onOpenBook={setOpenBook} laneDot={LANE_DOT[rec.lane]} />
               </aside>
             </div>
 
@@ -157,7 +163,7 @@ export function ConnectionsScreen() {
                 <p className="mt-1 text-xs text-muted">
                   {view.steps.length} {view.steps.length === 1 ? "salto" : "saltos"} desde tus pistas
                 </p>
-                <PathTimeline model={model} view={view} />
+                <PathTimeline model={model} view={view} onOpenBook={setOpenBook} />
                 <div className="mt-5 rounded-xl bg-chip px-4 py-3.5">
                   <div className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">En una frase</div>
                   <p className="mt-1.5 font-serif text-base leading-snug">{rec.pathSummary}</p>
@@ -168,6 +174,17 @@ export function ConnectionsScreen() {
               </div>
             </div>
 
+            {openBook && (
+              <ConnectionDialog
+                graph={model.graph}
+                nodeId={openBook}
+                onClose={() => setOpenBook(null)}
+                onShowConnections={(id) => {
+                  setOpenBook(null);
+                  setSelection({ kind: "node", id });
+                }}
+              />
+            )}
             {mapOpen && <FullMapDialog model={model} view={view} title={model.index.nodes.get(rec.nodeId)?.label ?? ""} onClose={() => setMapOpen(false)} />}
           </>
         )}
@@ -236,15 +253,21 @@ function FullMapDialog({ model, view, title, onClose }: { model: GraphModel; vie
   useEffect(() => {
     const dialog = ref.current;
     if (dialog && !dialog.open) dialog.showModal();
-    // Abrir el mapa con el recorrido a la vista: centrado entre su primera y su última parada.
-    const xs = view.rec.path.map((id) => model.layout.positions.get(id)?.x ?? 0);
-    const middle = (Math.min(...xs) + Math.max(...xs)) / 2;
-    if (scroller.current) scroller.current.scrollLeft = middle - scroller.current.clientWidth / 2;
+    // Abrir el mapa centrado en el libro del recorrido, que está en el medio de la constelación.
+    if (scroller.current) scroller.current.scrollLeft = (scroller.current.scrollWidth - scroller.current.clientWidth) / 2;
     return () => dialog?.close();
   }, [model, view.rec.path]);
 
   return (
-    <dialog ref={ref} aria-label="Mapa completo" onClose={onClose} className="animate-sheet m-0 h-dvh max-h-none w-full max-w-none bg-bg p-0 text-ink">
+    <dialog
+      ref={ref}
+      aria-label="Mapa completo"
+      onCancel={(e) => {
+        // Escape. Ver ClueDialog: no escuchamos "close" porque el cleanup lo dispara al desmontar.
+        e.preventDefault();
+        onClose();
+      }}
+      className="animate-sheet m-0 h-dvh max-h-none w-full max-w-none bg-bg p-0 text-ink">
       <div className="flex h-full flex-col">
         <div className="flex shrink-0 items-center justify-between border-b border-line px-3 pt-3 pb-2">
           <button type="button" aria-label="Cerrar el mapa" onClick={onClose} className="flex size-11 items-center justify-center">
@@ -257,7 +280,7 @@ function FullMapDialog({ model, view, title, onClose }: { model: GraphModel; vie
           <span className="w-11" />
         </div>
         <div ref={scroller} className="no-scrollbar min-h-0 flex-1 overflow-auto bg-surface pt-6">
-          <GraphCanvas model={model} view={view} selection={{ kind: "path" }} />
+          <GraphCanvas nodes={model.graph.nodes} focusId={view.rec.nodeId} view={view} selection={{ kind: "path" }} />
         </div>
         <p className="shrink-0 border-t border-line px-5 pt-3 pb-6 text-xs leading-normal text-muted">
           En acento, el camino hacia <span className="text-ink">{title}</span>. Los números siguen el orden del recorrido.

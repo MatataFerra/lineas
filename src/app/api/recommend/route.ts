@@ -1,6 +1,9 @@
 import { z } from "zod";
+import { llmConfigFromEnv } from "@/lib/recommend/config";
 import { currentEngine, recommendLanes } from "@/lib/recommend/engine";
 import { encodeEvent, RecommendRequestSchema } from "@/lib/recommend/events";
+import { chatJson } from "@/lib/recommend/llm-client";
+import { moderateClues, moderationMessage } from "@/lib/recommend/moderation";
 import { createRateLimiter } from "@/lib/rate-limit";
 
 /** Un carril puede tardar: el modelo con un reintento más la verificación en catálogos. */
@@ -31,6 +34,17 @@ export async function POST(request: Request) {
         { status: 429, headers: { "retry-after": String(verdict.retryAfterSeconds) } },
       );
     }
+  }
+
+  // Antes de gastar los carriles: las pistas tienen que ser algo que se pueda buscar en libros.
+  const verdict = await moderateClues(parsed.data.clues, {
+    llm: currentEngine() === "mock" ? undefined : llmConfigFromEnv(),
+    complete: chatJson,
+    onError: (error) => console.warn("[moderation] sigue sin filtro del modelo:", error instanceof Error ? error.message : error),
+  });
+  if (!verdict.ok) {
+    console.info(`[moderation] rechazada (${verdict.reason})`);
+    return Response.json({ error: moderationMessage(verdict), code: "blocked" }, { status: 422 });
   }
 
   const encoder = new TextEncoder();
