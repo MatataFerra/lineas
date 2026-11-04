@@ -124,8 +124,8 @@ export function ConnectionsScreen() {
                   }
                 />
                 <p className="px-4 pb-3.5 text-[11px] text-muted">
-                  {view.visibleNodes.size} de {model.graph.nodes.length} nodos · hasta {maxHops} {maxHops === 1 ? "salto" : "saltos"} desde tus pistas · el eje del
-                  tiempo se estira donde hay más conexiones
+                  {view.visibleNodes.size} de {model.graph.nodes.length} nodos · hasta {maxHops} {maxHops === 1 ? "salto" : "saltos"} desde tus pistas · de lo más antiguo, a
+                  la izquierda, a lo más nuevo
                 </p>
               </section>
               <aside className="max-w-[360px] min-w-[300px] flex-[1_1_320px] rounded-2xl border border-line bg-surface p-[22px]">
@@ -236,10 +236,8 @@ function FullMapDialog({ model, view, title, onClose }: { model: GraphModel; vie
   useEffect(() => {
     const dialog = ref.current;
     if (dialog && !dialog.open) dialog.showModal();
-    // Abrir el mapa con el recorrido a la vista: centrado entre su primera y su última parada.
-    const xs = view.rec.path.map((id) => model.layout.positions.get(id)?.x ?? 0);
-    const middle = (Math.min(...xs) + Math.max(...xs)) / 2;
-    if (scroller.current) scroller.current.scrollLeft = middle - scroller.current.clientWidth / 2;
+    // Abrir el mapa centrado en el libro del recorrido, que está en el medio de la constelación.
+    if (scroller.current) scroller.current.scrollLeft = (scroller.current.scrollWidth - scroller.current.clientWidth) / 2;
     return () => dialog?.close();
   }, [model, view.rec.path]);
 

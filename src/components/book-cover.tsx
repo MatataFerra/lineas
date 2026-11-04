@@ -22,11 +22,12 @@ export function coverColors(id: string) {
 const SIZES = {
   xs: { box: "h-[18px] w-3 rounded-[1px]", pad: "", title: "hidden", author: "hidden" },
   sm: { box: "h-[58px] w-10 rounded-[2px]", pad: "p-1.5", title: "text-[15px]", author: "hidden" },
+  graph: { box: "h-[92px] w-16 rounded-[2px]", pad: "px-1.5 py-2", title: "text-[11px]", author: "hidden" },
   md: { box: "h-[170px] w-[116px] rounded-[3px]", pad: "px-[11px] py-3.5", title: "text-[17px]", author: "text-[9px]" },
   lg: { box: "h-[220px] w-[150px] rounded-[3px]", pad: "px-3.5 py-[18px]", title: "text-[22px]", author: "text-[10px]" },
 };
 
-const IMAGE_SIZES = { xs: "12px", sm: "40px", md: "116px", lg: "150px" };
+const IMAGE_SIZES = { xs: "12px", sm: "40px", graph: "64px", md: "116px", lg: "150px" };
 
 /**
  * Portada del libro: la imagen real si el catálogo la tiene (`coverUrl`), si no
