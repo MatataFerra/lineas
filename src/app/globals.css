@@ -134,6 +134,9 @@ dialog::backdrop {
 @utility animate-orbit {
   animation: lineas-orbit 48s linear infinite;
 }
+@utility animate-orbit-fast {
+  animation: lineas-orbit 3.2s linear infinite;
+}
 @utility animate-breathe {
   animation: lineas-breathe 6s ease-in-out infinite;
 }

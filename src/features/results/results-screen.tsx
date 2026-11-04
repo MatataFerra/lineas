@@ -12,7 +12,7 @@ import type { Lane } from "@/lib/graph/schema";
 import { bookSnapshot, useLineas, type LaneState } from "@/lib/store";
 import { NoClues } from "@/components/no-clues";
 import { authorHref } from "@/lib/authors/link";
-import { LaneTrace } from "./lane-trace";
+import { LaneSearch } from "./lane-search";
 import { LibraryNotice } from "@/features/library/library-notice";
 
 export function ResultsScreen() {
@@ -186,7 +186,7 @@ function LaneSlot({ lane, state }: { lane: Lane; state: LaneState }) {
 function Waiting({ lane }: { lane: Lane }) {
   return (
     <div className="flex flex-1 flex-col" role="status">
-      <LaneTrace lane={lane} />
+      <LaneSearch lane={lane} />
       <p className="mt-2 font-serif text-[16px] leading-snug">{WAITING_COPY[lane]()}</p>
     </div>
   );
