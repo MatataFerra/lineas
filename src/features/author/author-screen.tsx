@@ -11,6 +11,7 @@ import { bookHref } from "@/lib/authors/link";
 import { authorSlug, type AuthorProfile } from "@/lib/authors/profile";
 import { EDGE_META } from "@/lib/graph/labels";
 import { otherEnd } from "@/lib/graph/queries";
+import { isFreeImage } from "@/lib/portraits/wikipedia";
 import { useLineas } from "@/lib/store";
 
 /**
@@ -44,10 +45,10 @@ export function AuthorScreen({ params }: { params: Promise<{ slug: string }> }) 
         <article className="mt-4 grid gap-8 md:mt-6 md:grid-cols-[220px_minmax(0,1fr)] md:gap-14 lg:grid-cols-[240px_minmax(0,720px)]">
           <aside className="flex items-end gap-5 md:block">
             <div className="relative h-[200px] w-[150px] shrink-0 overflow-hidden rounded-[3px] bg-chip shadow-[0_1px_2px_rgba(0,0,0,0.12),0_10px_20px_rgba(0,0,0,0.08)] md:h-[290px] md:w-[220px]">
-              {profile.data?.imageUrl ? (
+              {isFreeImage(profile.data?.imageUrl) ? (
                 <Image
-                  src={profile.data.imageUrl}
-                  alt={`Retrato de ${profile.data.name}`}
+                  src={profile.data!.imageUrl!}
+                  alt={`Retrato de ${profile.data!.name}`}
                   fill
                   sizes="220px"
                   className="animate-fade object-cover object-top [filter:grayscale(1)_sepia(0.25)_contrast(1.05)]"

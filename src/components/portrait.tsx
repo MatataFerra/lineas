@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { NodeKindIcon } from "@/components/icons";
 import type { GraphNode } from "@/lib/graph/schema";
+import { isFreeImage } from "@/lib/portraits/wikipedia";
 
 interface PortraitData {
   imageUrl: string | null;
@@ -46,7 +47,7 @@ export function usePortrait(node: GraphNode): PortraitData | null {
 export function Portrait({ node, size, className = "" }: { node: GraphNode; size: number; className?: string }) {
   const portrait = usePortrait(node);
   const [failed, setFailed] = useState(false);
-  const url = !failed ? portrait?.imageUrl : null;
+  const url = !failed && isFreeImage(portrait?.imageUrl) ? portrait.imageUrl : null;
   return (
     <span
       aria-hidden="true"

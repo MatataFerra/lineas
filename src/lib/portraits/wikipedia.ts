@@ -19,6 +19,15 @@ interface Summary {
   content_urls?: { desktop?: { page?: string } };
 }
 
+/**
+ * Solo imágenes de Wikimedia Commons, que son de licencia libre. Las de
+ * /wikipedia/en/ son de uso justo (portadas, retratos con copyright) y no se
+ * pueden reutilizar fuera de Wikipedia.
+ */
+export function isFreeImage(url: string | null | undefined): url is string {
+  return !!url && /^https:\/\/(upload|thumb)\.wikimedia\.org\/wikipedia\/commons\//.test(url);
+}
+
 const CREATIVE =
   /escrit|poet|novel|ensay|dramat|cuent|filós|music|músic|cantant|compos|pint|artist|escult|cineast|director|periodist|historiet|writer|novelist|essayist|playwright|philosoph|composer|painter|singer|saxophon|pianist|trumpet|sculptor|filmmaker|journalist|author/i;
 
@@ -50,13 +59,14 @@ export async function findArticle(
       if (!response.ok) continue;
       const page = (await response.json()) as Summary;
       if (page.type !== "standard") continue;
-      if (image && !page.thumbnail?.source) continue;
+      const imageUrl = page.thumbnail?.source?.split("?")[0];
+      if (image && !isFreeImage(imageUrl)) continue;
       if (creative && !CREATIVE.test(page.description ?? "")) continue;
       return {
         title: page.title ?? name,
         description: page.description,
         extract: page.extract,
-        imageUrl: page.thumbnail?.source?.split("?")[0],
+        ...(isFreeImage(imageUrl) ? { imageUrl } : {}),
         sourceUrl: page.content_urls?.desktop?.page ?? `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(name)}`,
         lang,
       };

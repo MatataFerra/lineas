@@ -1,7 +1,7 @@
 // Solo servidor.
 import "server-only";
 import { adminSupabase } from "@/lib/supabase/admin";
-import { findPortrait, type Portrait } from "./wikipedia";
+import { findPortrait, isFreeImage, type Portrait } from "./wikipedia";
 
 /**
  * Cada persona se busca en Wikipedia una sola vez: el resultado (también el
@@ -24,7 +24,9 @@ export async function portraitFor(slug: string, name: string, kind: "person" | "
       .maybeSingle()
       .then(({ data, error }) => (error ? null : data));
     const row = await Promise.race([read, new Promise<null>((r) => setTimeout(() => r(null), READ_BUDGET_MS))]);
-    const fresh = row && (row.image_url || Date.now() - Date.parse(row.fetched_at) < MISS_TTL_MS);
+    // Una imagen guardada que no es de Commons (de antes de este filtro) se busca de nuevo.
+    const unfree = !!row?.image_url && !isFreeImage(row.image_url);
+    const fresh = row && !unfree && (row.image_url || Date.now() - Date.parse(row.fetched_at) < MISS_TTL_MS);
     if (row && fresh) {
       const hit = row.image_url ? { imageUrl: row.image_url, sourceUrl: row.source_url ?? "" } : null;
       memory.set(slug, hit);

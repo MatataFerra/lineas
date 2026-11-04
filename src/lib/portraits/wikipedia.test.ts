@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { findPortrait } from "./wikipedia";
+import { findPortrait, isFreeImage } from "./wikipedia";
 
 const summary = (over: Record<string, unknown> = {}) => ({
   type: "standard",
@@ -46,5 +46,13 @@ describe("findPortrait", () => {
   it("sin imagen devuelve null", async () => {
     const fetch = fetchFrom({ "es.wikipedia.org": summary({ thumbnail: undefined }), "en.wikipedia.org": summary({ thumbnail: undefined }) });
     expect(await findPortrait("Alguien", "person", { fetch })).toBeNull();
+  });
+});
+
+describe("isFreeImage", () => {
+  it("acepta Commons y rechaza las imágenes de uso justo de cada Wikipedia", () => {
+    expect(isFreeImage("https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/X.jpg/330px-X.jpg")).toBe(true);
+    expect(isFreeImage("https://thumb.wikimedia.org/wikipedia/en/thumb/9/9d/W._G._Sebald.jpg/330px-W._G._Sebald.jpg")).toBe(false);
+    expect(isFreeImage(undefined)).toBe(false);
   });
 });
