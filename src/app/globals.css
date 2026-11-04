@@ -17,6 +17,7 @@
   --accent: #c9402a;
   --accent-ink: #ffffff;
   --scrim: rgb(30 28 25 / 0.3);
+  --art-fold: #d8cdbb;
   color-scheme: light;
 }
 
@@ -32,6 +33,7 @@
     --grid: #2a2723;
     --edge: #6f685d;
     --scrim: rgb(0 0 0 / 0.6);
+    --art-fold: #0e0d0c;
     color-scheme: dark;
   }
 }
@@ -47,6 +49,7 @@
   --grid: #2a2723;
   --edge: #6f685d;
   --scrim: rgb(0 0 0 / 0.6);
+  --art-fold: #0e0d0c;
   color-scheme: dark;
 }
 
@@ -169,13 +172,18 @@ dialog::backdrop {
 ::view-transition {
   pointer-events: none;
 }
+/* Un relevo, no un fundido cruzado: lo viejo se va del todo antes de que entre lo nuevo. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
 ::view-transition-old(.page) {
-  animation: 140ms ease-in both lineas-vt-fade reverse;
+  animation: 90ms ease-in both lineas-vt-out;
 }
 ::view-transition-new(.page) {
   animation:
-    240ms ease-out 110ms both lineas-vt-fade,
-    420ms cubic-bezier(0.2, 0.7, 0.2, 1) both lineas-vt-rise;
+    220ms ease-out 90ms both lineas-vt-in,
+    360ms cubic-bezier(0.2, 0.7, 0.2, 1) 90ms both lineas-vt-rise;
 }
 ::view-transition-group(site-header) {
   animation-duration: 420ms;
@@ -189,19 +197,19 @@ dialog::backdrop {
   animation: none;
 }
 ::view-transition-old(home-art) {
-  animation: 260ms ease-in both lineas-vt-art-out;
+  animation: 120ms ease-in both lineas-vt-art-out;
 }
 ::view-transition-new(home-art) {
-  animation: 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both lineas-vt-art-in;
+  animation: 380ms cubic-bezier(0.2, 0.7, 0.2, 1) 60ms both lineas-vt-art-in;
 }
-@keyframes lineas-vt-fade {
+@keyframes lineas-vt-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes lineas-vt-in {
   from {
     opacity: 0;
-    filter: blur(2px);
-  }
-  to {
-    opacity: 1;
-    filter: blur(0);
   }
 }
 @keyframes lineas-vt-rise {
@@ -214,14 +222,14 @@ dialog::backdrop {
 }
 @keyframes lineas-vt-art-out {
   to {
-    translate: -100% 0;
-    opacity: 0.4;
+    translate: -24px 0;
+    opacity: 0;
   }
 }
 @keyframes lineas-vt-art-in {
   from {
-    translate: -100% 0;
-    opacity: 0.4;
+    translate: -24px 0;
+    opacity: 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -254,10 +262,18 @@ dialog::backdrop {
   transform-origin: 0 0;
   animation: art-unfold 0.8s cubic-bezier(0.2, 1.2, 0.4, 1) var(--delay, 0s) both;
 }
-.art-sway {
+.art-turn {
   transform-box: view-box;
-  transform-origin: 100px 716px;
-  animation: art-sway 9s ease-in-out 4s infinite alternate;
+  transform-origin: 100px 740px;
+  animation: art-turn 6s ease-in-out infinite alternate;
+}
+.art-flap {
+  transform-box: view-box;
+  transform-origin: 0 -1.5px;
+  animation: art-flap 1.6s ease-in-out infinite;
+}
+.art-drift {
+  animation: art-drift 7s ease-in-out infinite alternate;
 }
 .art-breathe {
   transform-box: fill-box;
@@ -278,11 +294,6 @@ dialog::backdrop {
 }
 .art-rise {
   animation: art-rise 9s linear var(--delay, 0s) infinite;
-}
-.art-pulse {
-  offset-rotate: 0deg;
-  opacity: 0;
-  animation: art-pulse 7s ease-in-out 4.2s infinite;
 }
 /* Con extremos redondeados, un trazo sin dibujar igual deja un punto: se oculta hasta que arranca. */
 @keyframes art-draw {
@@ -318,12 +329,29 @@ dialog::backdrop {
     transform: scale(1);
   }
 }
-@keyframes art-sway {
+@keyframes art-turn {
   from {
-    rotate: -1.1deg;
+    transform: rotate(-2deg) scaleX(0.96);
   }
   to {
-    rotate: 1.1deg;
+    transform: rotate(1.5deg) scaleX(1.02);
+  }
+}
+@keyframes art-flap {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(-0.35);
+  }
+}
+@keyframes art-drift {
+  from {
+    translate: -3px 0;
+  }
+  to {
+    translate: 4px -1px;
   }
 }
 @keyframes art-breathe {
@@ -377,43 +405,23 @@ dialog::backdrop {
     translate: 8px -190px;
   }
 }
-@keyframes art-pulse {
-  0% {
-    offset-distance: 0%;
-    opacity: 0;
-  }
-  6% {
-    opacity: 1;
-  }
-  55% {
-    opacity: 1;
-  }
-  62% {
-    offset-distance: 100%;
-    opacity: 0;
-  }
-  100% {
-    offset-distance: 100%;
-    opacity: 0;
-  }
-}
 @media (prefers-reduced-motion: reduce) {
   .art-draw,
   .art-pop,
   .art-unfold,
-  .art-sway,
+  .art-turn,
+  .art-flap,
+  .art-drift,
   .art-breathe,
   .art-twinkle,
   .art-spin,
   .art-note,
-  .art-rise,
-  .art-pulse {
+  .art-rise {
     animation: none;
   }
   .art-draw {
     stroke-dashoffset: 0;
   }
-  .art-pulse,
   .art-note {
     opacity: 0;
   }
