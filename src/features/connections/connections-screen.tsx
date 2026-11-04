@@ -244,7 +244,15 @@ function FullMapDialog({ model, view, title, onClose }: { model: GraphModel; vie
   }, [model, view.rec.path]);
 
   return (
-    <dialog ref={ref} aria-label="Mapa completo" onClose={onClose} className="animate-sheet m-0 h-dvh max-h-none w-full max-w-none bg-bg p-0 text-ink">
+    <dialog
+      ref={ref}
+      aria-label="Mapa completo"
+      onCancel={(e) => {
+        // Escape. Ver ClueDialog: no escuchamos "close" porque el cleanup lo dispara al desmontar.
+        e.preventDefault();
+        onClose();
+      }}
+      className="animate-sheet m-0 h-dvh max-h-none w-full max-w-none bg-bg p-0 text-ink">
       <div className="flex h-full flex-col">
         <div className="flex shrink-0 items-center justify-between border-b border-line px-3 pt-3 pb-2">
           <button type="button" aria-label="Cerrar el mapa" onClick={onClose} className="flex size-11 items-center justify-center">

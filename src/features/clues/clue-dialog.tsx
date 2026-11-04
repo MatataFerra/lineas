@@ -61,7 +61,12 @@ export function ClueDialog({ initialKind = "book", onClose, onSearch }: ClueDial
     <dialog
       ref={ref}
       aria-label="Añadir pistas"
-      onClose={onClose}
+      onCancel={(e) => {
+        // Escape. No escuchamos "close": el cleanup del efecto cierra el <dialog> al desmontar
+        // (y en desarrollo React monta dos veces), y eso volvía a cerrar el modal recién abierto.
+        e.preventDefault();
+        onClose();
+      }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -101,7 +106,7 @@ export function ClueDialog({ initialKind = "book", onClose, onSearch }: ClueDial
             <div className="no-scrollbar mt-2.5 flex gap-2 overflow-x-auto px-5">
               {clues.length === 0 && <span className="text-[13px] text-muted">Todavía no agregaste ninguna.</span>}
               {clues.map((clue) => (
-                <span key={clue.id} className="inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-full border border-line bg-chip pr-0.5 pl-3 text-[13px] whitespace-nowrap">
+                <span key={clue.id} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-chip pr-0.5 pl-3 text-[13px] whitespace-nowrap">
                   <span className="text-[11px] text-muted">{CLUE_KIND_META[clue.kind].short}</span>
                   {clue.label}
                   <button type="button" aria-label={`Quitar ${clue.label}`} onClick={() => removeClue(clue.id)} className="flex size-[30px] items-center justify-center text-muted">
@@ -128,13 +133,17 @@ export function ClueDialog({ initialKind = "book", onClose, onSearch }: ClueDial
                   }}
                   className={[
                     "flex shrink-0 items-center gap-[7px] rounded-full border px-3.5 py-0 text-[13px] font-medium whitespace-nowrap h-10",
-                    "md:h-auto md:items-start md:gap-3.5 md:rounded-[10px] md:border-0 md:px-3 md:py-[11px] md:text-left md:whitespace-normal",
+                    "md:h-auto md:items-center md:gap-3.5 md:rounded-[10px] md:border-0 md:px-3 md:py-[11px] md:text-left md:whitespace-normal",
                     active ? "border-ink bg-ink text-bg md:bg-chip-active md:text-ink" : "border-line md:bg-transparent md:hover:bg-chip-active/60",
                   ].join(" ")}
                 >
-                  <ClueKindIcon kind={k} size={18} className={`shrink-0 md:mt-px ${active ? "md:text-accent" : "md:text-muted"}`} />
+                  <span
+                    aria-hidden="true"
+                    className={`flex shrink-0 items-center justify-center md:size-10 md:rounded-full md:border ${active ? "md:border-accent/30 md:bg-surface md:text-accent" : "md:border-line/70 md:bg-bg md:text-ink"}`}>
+                    <ClueKindIcon kind={k} size={18} className="md:size-[22px]" />
+                  </span>
                   <span className="flex flex-col gap-0.5">
-                    <span className="md:text-sm">{isDesktop ? m.label : m.short}</span>
+                    <span className="md:font-serif md:text-[15px] md:font-normal">{isDesktop ? m.label : m.short}</span>
                     <span className="hidden text-xs leading-snug font-normal text-muted md:block">{m.description}</span>
                   </span>
                 </button>
@@ -162,7 +171,7 @@ export function ClueDialog({ initialKind = "book", onClose, onSearch }: ClueDial
               />
             </label>
 
-            <div className="mt-5 mb-2 hidden text-[11px] font-semibold tracking-[0.08em] text-muted uppercase md:block">
+            <div className="mt-5 mb-2 hidden font-serif text-[15px] md:block">
               {trimmed ? "Resultados" : "Sugerencias"}
             </div>
 

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowRightIcon, CloseIcon, PlusIcon } from "@/components/icons";
+import { ArrowRightIcon, ClueKindIcon, CloseIcon, PlusIcon } from "@/components/icons";
 import { SiteHeader } from "@/components/site-header";
 import { CLUE_KIND_META } from "@/lib/graph/labels";
 import type { ClueKind } from "@/lib/graph/schema";
@@ -67,8 +67,9 @@ export function HomeScreen() {
                 <span
                   key={clue.id}
                   title={CLUE_KIND_META[clue.kind].label}
-                  className="inline-flex h-[34px] items-center gap-0.5 rounded-full border border-line bg-chip pr-0.5 pl-3 text-[13px] md:pl-3.5"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-chip pr-0.5 pl-2.5 text-[13px] md:pl-3"
                 >
+                  <ClueKindIcon kind={clue.kind} size={14} className="text-muted" />
                   {clue.label}
                   <button type="button" aria-label={`Quitar ${clue.label}`} onClick={() => removeClue(clue.id)} className="flex size-[30px] items-center justify-center text-muted hover:text-ink">
                     <CloseIcon size={12} strokeWidth={2} />
@@ -79,9 +80,9 @@ export function HomeScreen() {
                 type="button"
                 aria-label="Añadir pista"
                 onClick={() => setDialogKind("book")}
-                className="flex size-[34px] items-center justify-center rounded-full border border-dashed border-line text-muted hover:text-ink"
+                className="flex size-9 items-center justify-center rounded-lg text-ink hover:bg-chip"
               >
-                <PlusIcon size={14} />
+                <PlusIcon size={16} />
               </button>
               <div className="flex-1" />
               <button
