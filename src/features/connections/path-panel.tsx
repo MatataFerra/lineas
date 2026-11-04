@@ -2,7 +2,9 @@
 
 import { ArrowLeftIcon, ArrowRightIcon } from "@/components/icons";
 import { LANE_META, NODE_KIND_LABEL } from "@/lib/graph/labels";
+import type { GraphNode } from "@/lib/graph/schema";
 import { otherEnd } from "@/lib/graph/queries";
+import { Portrait, usePortrait } from "@/components/portrait";
 import { VoteControl } from "@/components/vote-control";
 import { bookSnapshot, edgeKey, useLineas } from "@/lib/store";
 import { LibraryNotice } from "@/features/library/library-notice";
@@ -35,6 +37,7 @@ export function PathPanel({ model, view, selection, onSelect, onOpenBook, laneDo
     return (
       <div key={node.id} className="animate-fade">
         <BackButton onClick={back} />
+        {(node.kind === "person" || node.kind === "art") && <PanelPortrait node={node} />}
         <span className="mt-3 block w-fit rounded-full border border-line px-2 py-0.5 text-[11px] text-muted">{NODE_KIND_LABEL[node.kind]}</span>
         <h2 className="mt-2.5 font-serif text-[26px] leading-[1.1]">{node.label}</h2>
         <p className="mt-1.5 text-xs text-muted">{[node.subtitle, node.era.label].filter(Boolean).join(" · ")}</p>
@@ -156,5 +159,22 @@ function BackButton({ onClick }: { onClick: () => void }) {
       <ArrowLeftIcon size={12} strokeWidth={2} />
       Volver al recorrido
     </button>
+  );
+}
+
+function PanelPortrait({ node }: { node: GraphNode }) {
+  const portrait = usePortrait(node);
+  return (
+    <figure className="mt-4 flex items-end gap-3">
+      <Portrait node={node} size={88} />
+      {portrait?.imageUrl && portrait.sourceUrl && (
+        <figcaption className="pb-1 text-[11px] text-muted">
+          Imagen:{" "}
+          <a href={portrait.sourceUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-ink">
+            Wikipedia
+          </a>
+        </figcaption>
+      )}
+    </figure>
   );
 }

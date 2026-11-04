@@ -193,6 +193,30 @@ export type Database = {
         }
         Relationships: []
       }
+      portraits: {
+        Row: {
+          fetched_at: string
+          image_url: string | null
+          name: string
+          slug: string
+          source_url: string | null
+        }
+        Insert: {
+          fetched_at?: string
+          image_url?: string | null
+          name: string
+          slug: string
+          source_url?: string | null
+        }
+        Update: {
+          fetched_at?: string
+          image_url?: string | null
+          name?: string
+          slug?: string
+          source_url?: string | null
+        }
+        Relationships: []
+      }
       rec_signals: {
         Row: {
           book_slug: string

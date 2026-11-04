@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BookCover } from "@/components/book-cover";
-import { NodeKindIcon } from "@/components/icons";
+import { Portrait } from "@/components/portrait";
 import { NODE_KIND_LABEL } from "@/lib/graph/labels";
 import { RADIAL, radialEdge, radialLayout } from "@/lib/graph/radial";
 import type { GraphNode } from "@/lib/graph/schema";
@@ -150,9 +150,7 @@ function FocusContent({ node }: { node: GraphNode }) {
 function CardContent({ node }: { node: GraphNode }) {
   return (
     <>
-      <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full border border-line/70 bg-bg">
-        <NodeKindIcon kind={node.kind} size={20} />
-      </span>
+      <Portrait node={node} size={38} />
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className={`line-clamp-2 font-serif text-[14px] leading-[1.15] ${node.kind === "concept" ? "italic" : ""}`}>{node.label}</span>
         <span className="truncate text-[11px] text-muted">{node.isClue ? "Tu pista" : NODE_KIND_LABEL[node.kind]} · {node.era.label}</span>
