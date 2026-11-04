@@ -65,7 +65,7 @@ export function BookCover({
       className={`box-border flex shrink-0 flex-col shadow-[0_1px_2px_rgba(0,0,0,0.12),0_10px_20px_rgba(0,0,0,0.08)] ${s.box} ${s.pad} ${initialOnly ? "justify-end" : "justify-between"}`}
       style={{ background: colors.bg, color: colors.ink }}
     >
-      <span className={`font-serif leading-[1.05] ${s.title}`}>{initialOnly ? title.charAt(0) : title}</span>
+      <span lang="es" className={`font-serif leading-[1.05] hyphens-auto [overflow-wrap:anywhere] ${s.title}`}>{initialOnly ? title.charAt(0) : title}</span>
       {author && <span className={`uppercase tracking-[0.06em] opacity-85 ${s.author}`}>{author}</span>}
     </span>
   );

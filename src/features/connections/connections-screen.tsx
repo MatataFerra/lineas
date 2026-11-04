@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/site-header";
 import { EDGE_META, EDGE_ORDER, LANE_META, LANE_ORDER } from "@/lib/graph/labels";
 import { GRAPH_LIMITS, type EdgeType, type Lane, type Recommendation } from "@/lib/graph/schema";
 import { useLineas } from "@/lib/store";
+import { ConnectionDialog } from "./connection-dialog";
 import { GraphCanvas } from "./graph-canvas";
 import { MiniMap } from "./mini-map";
 import { buildModel, viewState, type GraphModel, type Selection, type ViewState } from "./model";
@@ -31,6 +32,7 @@ export function ConnectionsScreen() {
   const [maxHops, setMaxHops] = useState<number>(GRAPH_LIMITS.maxHops);
   const [hiddenTypes, setHiddenTypes] = useState<ReadonlySet<EdgeType>>(new Set());
   const [mapOpen, setMapOpen] = useState(false);
+  const [openBook, setOpenBook] = useState<string | null>(null);
 
   const model = useMemo(() => (graph ? buildModel(graph) : null), [graph]);
   const recs = useMemo(
@@ -44,6 +46,12 @@ export function ConnectionsScreen() {
     () => (model && rec ? viewState(model, rec, selection, maxHops, hiddenTypes) : null),
     [model, rec, selection, maxHops, hiddenTypes],
   );
+
+  // En el mapa, un libro abre «La conexión»; personas, movimientos e ideas se ven en el panel.
+  const selectOnMap = (next: Selection) => {
+    if (next.kind === "node" && model?.index.nodes.get(next.id)?.kind === "book") setOpenBook(next.id);
+    else setSelection(next);
+  };
 
   const choose = (r: Recommendation) => {
     setFocus(r.nodeId);
@@ -108,7 +116,7 @@ export function ConnectionsScreen() {
             <div className="mt-[18px] hidden items-start gap-5 lg:flex">
               <section aria-label="Mapa" className="min-w-0 flex-[999_1_640px] overflow-hidden rounded-2xl border border-line bg-surface">
                 <div className="overflow-x-auto pt-2">
-                  <GraphCanvas model={model} view={view} selection={selection} onSelect={setSelection} />
+                  <GraphCanvas model={model} view={view} selection={selection} onSelect={selectOnMap} />
                 </div>
                 <MapControls
                   maxHops={maxHops}
@@ -157,7 +165,7 @@ export function ConnectionsScreen() {
                 <p className="mt-1 text-xs text-muted">
                   {view.steps.length} {view.steps.length === 1 ? "salto" : "saltos"} desde tus pistas
                 </p>
-                <PathTimeline model={model} view={view} />
+                <PathTimeline model={model} view={view} onOpenBook={setOpenBook} />
                 <div className="mt-5 rounded-xl bg-chip px-4 py-3.5">
                   <div className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">En una frase</div>
                   <p className="mt-1.5 font-serif text-base leading-snug">{rec.pathSummary}</p>
@@ -168,6 +176,17 @@ export function ConnectionsScreen() {
               </div>
             </div>
 
+            {openBook && (
+              <ConnectionDialog
+                graph={model.graph}
+                nodeId={openBook}
+                onClose={() => setOpenBook(null)}
+                onShowConnections={(id) => {
+                  setOpenBook(null);
+                  setSelection({ kind: "node", id });
+                }}
+              />
+            )}
             {mapOpen && <FullMapDialog model={model} view={view} title={model.index.nodes.get(rec.nodeId)?.label ?? ""} onClose={() => setMapOpen(false)} />}
           </>
         )}
