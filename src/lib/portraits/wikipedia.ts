@@ -12,6 +12,8 @@ export interface Portrait {
 
 interface Summary {
   type?: string;
+  title?: string;
+  extract?: string;
   description?: string;
   thumbnail?: { source?: string };
   content_urls?: { desktop?: { page?: string } };
@@ -20,8 +22,26 @@ interface Summary {
 const CREATIVE =
   /escrit|poet|novel|ensay|dramat|cuent|filós|music|músic|cantant|compos|pint|artist|escult|cineast|director|periodist|historiet|writer|novelist|essayist|playwright|philosoph|composer|painter|singer|saxophon|pianist|trumpet|sculptor|filmmaker|journalist|author/i;
 
-export async function findPortrait(name: string, kind: "person" | "art", { fetch: fetchImpl = fetch, timeoutMs = 2500 }: { fetch?: typeof fetch; timeoutMs?: number } = {}): Promise<Portrait | null> {
-  for (const lang of ["es", "en"]) {
+export interface Article {
+  title: string;
+  description?: string;
+  /** El primer párrafo del artículo, en texto plano. */
+  extract?: string;
+  imageUrl?: string;
+  sourceUrl: string;
+  lang: "es" | "en";
+}
+
+/**
+ * El resumen del artículo de Wikipedia con ese nombre (castellano, después
+ * inglés). `creative`: solo artículos cuya descripción habla de un oficio
+ * creativo; `image`: solo artículos con imagen.
+ */
+export async function findArticle(
+  name: string,
+  { creative = false, image = false, fetch: fetchImpl = fetch, timeoutMs = 2500 }: { creative?: boolean; image?: boolean; fetch?: typeof fetch; timeoutMs?: number } = {},
+): Promise<Article | null> {
+  for (const lang of ["es", "en"] as const) {
     try {
       const response = await fetchImpl(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name.replace(/ /g, "_"))}`, {
         signal: AbortSignal.timeout(timeoutMs),
@@ -29,12 +49,25 @@ export async function findPortrait(name: string, kind: "person" | "art", { fetch
       });
       if (!response.ok) continue;
       const page = (await response.json()) as Summary;
-      if (page.type !== "standard" || !page.thumbnail?.source) continue;
-      if (kind === "person" && !CREATIVE.test(page.description ?? "")) continue;
-      return { imageUrl: page.thumbnail.source.split("?")[0], sourceUrl: page.content_urls?.desktop?.page ?? `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(name)}` };
+      if (page.type !== "standard") continue;
+      if (image && !page.thumbnail?.source) continue;
+      if (creative && !CREATIVE.test(page.description ?? "")) continue;
+      return {
+        title: page.title ?? name,
+        description: page.description,
+        extract: page.extract,
+        imageUrl: page.thumbnail?.source?.split("?")[0],
+        sourceUrl: page.content_urls?.desktop?.page ?? `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(name)}`,
+        lang,
+      };
     } catch {
       // Un idioma que falla no corta la búsqueda: probamos el siguiente.
     }
   }
   return null;
+}
+
+export async function findPortrait(name: string, kind: "person" | "art", options: { fetch?: typeof fetch; timeoutMs?: number } = {}): Promise<Portrait | null> {
+  const article = await findArticle(name, { ...options, creative: kind === "person", image: true });
+  return article?.imageUrl ? { imageUrl: article.imageUrl, sourceUrl: article.sourceUrl } : null;
 }

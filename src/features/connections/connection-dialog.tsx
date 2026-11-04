@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BookCover } from "@/components/book-cover";
 import { ArrowLeftIcon, ArrowRightIcon, CloseIcon } from "@/components/icons";
+import { authorHref } from "@/lib/authors/link";
 import { booksInOrder, connectionDetail } from "@/lib/graph/connection-detail";
 import { EdgeTypeBadge } from "./connection-badges";
 import type { ConnectionGraph } from "@/lib/graph/schema";
@@ -81,7 +82,12 @@ export function ConnectionDialog({ graph, nodeId, onClose, onShowConnections }: 
               {node.label}
             </h2>
             <p className="mt-2 text-[13px] text-muted">
-              {detail.author} · {detail.year}
+              {detail.author && (
+                <Link href={authorHref(detail.author)} className="underline-offset-[3px] hover:text-ink hover:underline">
+                  {detail.author}
+                </Link>
+              )}{" "}
+              · {detail.year}
               {detail.isClue && <span className="ml-2 rounded-full bg-ink px-2 py-0.5 text-[11px] text-bg">Tu pista</span>}
             </p>
             {detail.tags.length > 0 && (

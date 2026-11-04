@@ -53,10 +53,22 @@ export function GraphCanvas({ model, view, selection, onSelect }: GraphCanvasPro
     <div ref={box} className="w-full" style={{ height: layout.height * scale }}>
       <div className="relative origin-top-left" style={{ width: layout.width, height: layout.height, transform: scale < 1 ? `scale(${scale})` : undefined }}>
         <svg width={layout.width} height={layout.height} className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden="true">
-          {/* El halo del libro elegido: un anillo fino con dos marcas, como un sello. */}
-          <circle cx={center.x} cy={center.y} r={RADIAL.focus / 2 + 14} fill="none" className="stroke-accent/25" strokeWidth={1} />
-          <circle cx={center.x} cy={center.y - RADIAL.focus / 2 - 14} r={2.5} className="fill-accent" />
-          <circle cx={center.x} cy={center.y + RADIAL.focus / 2 + 14} r={2.5} className="fill-accent" />
+          {/* El halo del libro elegido: un anillo fino con dos marcas que orbitan despacio y un eco que respira. */}
+          <g className="animate-orbit" style={{ transformOrigin: `${center.x}px ${center.y}px` }}>
+            <circle cx={center.x} cy={center.y} r={RADIAL.focus / 2 + 14} fill="none" className="stroke-accent/25" strokeWidth={1} />
+            <circle cx={center.x} cy={center.y - RADIAL.focus / 2 - 14} r={2.5} className="fill-accent" />
+            <circle cx={center.x} cy={center.y + RADIAL.focus / 2 + 14} r={2.5} className="fill-accent" />
+          </g>
+          <circle
+            cx={center.x}
+            cy={center.y}
+            r={RADIAL.focus / 2 + 26}
+            fill="none"
+            className="animate-breathe stroke-accent/20"
+            strokeWidth={1}
+            strokeDasharray="2 6"
+            style={{ transformOrigin: `${center.x}px ${center.y}px` }}
+          />
           {edges.map(({ edge, d }) => {
             const hi = view.highlightEdges.has(edge.id);
             return (

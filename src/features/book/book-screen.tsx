@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { use, useEffect, useState } from "react";
 import { BookCover } from "@/components/book-cover";
 import { ArrowLeftIcon, ArrowRightIcon } from "@/components/icons";
 import { SiteHeader } from "@/components/site-header";
 import type { BookDetails } from "@/lib/catalog/details";
-import { bookSnapshot, useLineas } from "@/lib/store";
+import { authorHref } from "@/lib/authors/link";
+import { bookSnapshot, useLineas, type BookSnapshot } from "@/lib/store";
 import { LibraryNotice } from "@/features/library/library-notice";
 
 /**
@@ -19,6 +20,7 @@ import { LibraryNotice } from "@/features/library/library-notice";
 export function BookScreen({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const graph = useLineas((s) => s.graph);
   const status = useLineas((s) => s.status);
   const search = useLineas((s) => s.search);
@@ -34,7 +36,11 @@ export function BookScreen({ params }: { params: Promise<{ id: string }> }) {
   const node = graph?.nodes.find((n) => n.id === id && n.kind === "book");
   const rec = graph?.recommendations.find((r) => r.nodeId === id);
   const entry = library[id];
-  const snapshot = node ? bookSnapshot(node) : entry;
+  // Un libro fuera del mapa y de la biblioteca (por ejemplo, desde la página de un autor) llega con sus datos en la URL.
+  const fromUrl: BookSnapshot | undefined = searchParams.get("t")
+    ? { id, title: searchParams.get("t")!, author: searchParams.get("a"), yearLabel: searchParams.get("y"), coverUrl: searchParams.get("c") }
+    : undefined;
+  const snapshot = node ? bookSnapshot(node) : (entry ?? fromUrl);
   const details = useBookDetails(snapshot?.title, snapshot?.author ?? undefined, node?.book?.googleBooksId);
 
   if (!snapshot) {
@@ -100,7 +106,15 @@ export function BookScreen({ params }: { params: Promise<{ id: string }> }) {
 
         <div className="min-w-0">
           <h1 className="font-serif text-[34px] leading-[1.06] tracking-[-0.01em] md:text-[46px]">{snapshot.title}</h1>
-          <p className="mt-2 text-sm text-muted">{[snapshot.author, year].filter(Boolean).join(" · ")}</p>
+          <p className="mt-2 text-sm text-muted">
+            {snapshot.author && (
+              <Link href={authorHref(snapshot.author)} className="underline-offset-[3px] hover:text-ink hover:underline">
+                {snapshot.author}
+              </Link>
+            )}
+            {snapshot.author && year && " · "}
+            {year}
+          </p>
 
           {details.data && details.data.categories.length > 0 && (
             <ul className="mt-5 flex flex-wrap gap-1.5" aria-label="Géneros">

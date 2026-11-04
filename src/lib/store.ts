@@ -106,11 +106,6 @@ export function edgeKey(edge: Pick<GraphEdge, "source" | "target" | "type">): st
   return `${edge.type}|${a}|${b}`;
 }
 
-const INITIAL_CLUES: Clue[] = [
-  { id: "c1", kind: "book", label: "On the Road" },
-  { id: "c2", kind: "movement", label: "Generación Beat" },
-  { id: "c3", kind: "feeling", label: "La libertad" },
-];
 
 const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 const keyOf = (clues: Clue[]) => JSON.stringify(clues.map((c) => [c.kind, c.label.toLowerCase()]));
@@ -130,7 +125,7 @@ function withStatus(library: Record<string, LibraryEntry>, book: BookSnapshot, s
 let searchAbort: AbortController | null = null;
 
 export const useLineas = create<LineasState>()((set, get) => ({
-  clues: INITIAL_CLUES,
+  clues: [],
   lanes: emptyLanes(),
   graph: null,
   status: "idle",

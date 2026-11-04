@@ -10,6 +10,8 @@ import { LANE_META, LANE_ORDER } from "@/lib/graph/labels";
 import { recommendedBook } from "@/lib/graph/merge";
 import type { Lane } from "@/lib/graph/schema";
 import { bookSnapshot, useLineas, type LaneState } from "@/lib/store";
+import { NoClues } from "@/components/no-clues";
+import { authorHref } from "@/lib/authors/link";
 import { LaneTrace } from "./lane-trace";
 import { LibraryNotice } from "@/features/library/library-notice";
 
@@ -29,6 +31,17 @@ export function ResultsScreen() {
   // En mobile, mientras el usuario no elija, se abre el primer carril que llega.
   const firstReady = LANE_ORDER.find((l) => lanes[l].status === "ready");
   const shownLane = mobileLane ?? firstReady ?? "affinity";
+
+  if (clues.length === 0) {
+    return (
+      <div className="min-h-dvh px-5.5 pt-5 pb-12 md:px-14 md:pt-7">
+        <div className="mx-auto max-w-290">
+          <SiteHeader />
+          <NoClues />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-dvh px-5.5 pt-5 pb-12 md:px-14 md:pt-7">
@@ -227,7 +240,12 @@ function LaneCard({ lane, state }: { lane: Lane; state: LaneState }) {
             </Link>
           </h2>
           <p className="mt-1 text-[13px] text-muted">
-            {author} · {node.era.label}
+            {author ? (
+              <Link href={authorHref(author)} className="underline-offset-[3px] hover:text-ink hover:underline">
+                {author}
+              </Link>
+            ) : null}{" "}
+            · {node.era.label}
           </p>
           {node.book && !node.book.verified && (
             <p

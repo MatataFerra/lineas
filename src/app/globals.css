@@ -114,6 +114,30 @@ dialog::backdrop {
   }
 }
 
+/* El halo del libro en el centro del mapa. */
+@keyframes lineas-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes lineas-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.97) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04) rotate(-12deg);
+  }
+}
+@utility animate-orbit {
+  animation: lineas-orbit 48s linear infinite;
+}
+@utility animate-breathe {
+  animation: lineas-breathe 6s ease-in-out infinite;
+}
+
 @utility animate-fade {
   animation: lineas-fade 0.3s ease;
 }

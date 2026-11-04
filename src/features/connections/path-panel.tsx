@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { ArrowLeftIcon, ArrowRightIcon } from "@/components/icons";
+import { authorHref } from "@/lib/authors/link";
 import { LANE_META, NODE_KIND_LABEL } from "@/lib/graph/labels";
 import type { GraphNode } from "@/lib/graph/schema";
 import { otherEnd } from "@/lib/graph/queries";
@@ -41,6 +43,14 @@ export function PathPanel({ model, view, selection, onSelect, onOpenBook, laneDo
         <span className="mt-3 block w-fit rounded-full border border-line px-2 py-0.5 text-[11px] text-muted">{NODE_KIND_LABEL[node.kind]}</span>
         <h2 className="mt-2.5 font-serif text-[26px] leading-[1.1]">{node.label}</h2>
         <p className="mt-1.5 text-xs text-muted">{[node.subtitle, node.era.label].filter(Boolean).join(" · ")}</p>
+        {node.kind === "person" && (
+          <Link
+            href={authorHref(node.label)}
+            className="mt-4 inline-flex h-10 items-center gap-2 rounded-full border border-ink px-4 text-[13px] font-medium hover:bg-ink hover:text-bg">
+            Ver su vida y sus obras
+            <ArrowRightIcon size={13} />
+          </Link>
+        )}
         {node.kind === "book" && (
           <button
             type="button"

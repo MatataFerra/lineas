@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeftIcon, CloseIcon, ExpandIcon } from "@/components/icons";
+import { NoClues } from "@/components/no-clues";
 import { SiteHeader } from "@/components/site-header";
 import { EDGE_META, EDGE_ORDER, LANE_META, LANE_ORDER } from "@/lib/graph/labels";
 import { GRAPH_LIMITS, type EdgeType, type Lane, type Recommendation } from "@/lib/graph/schema";
@@ -18,6 +19,7 @@ const LANE_DOT: Record<Lane, string> = { affinity: "var(--ink)", alternative: "v
 
 export function ConnectionsScreen() {
   const graph = useLineas((s) => s.graph);
+  const clueCount = useLineas((s) => s.clues.length);
   const status = useLineas((s) => s.status);
   const error = useLineas((s) => s.error);
   const search = useLineas((s) => s.search);
@@ -70,7 +72,9 @@ export function ConnectionsScreen() {
           </p>
         </div>
 
-        {status === "error" && (
+        {clueCount === 0 && <NoClues />}
+
+        {clueCount > 0 && status === "error" && (
           <div role="alert" className="mt-8 rounded-2xl border border-line bg-surface p-6 text-sm">
             {error}
             <button type="button" onClick={() => void search()} className="mt-4 block h-10 rounded-full bg-ink px-5 text-[13px] text-bg">
@@ -79,7 +83,7 @@ export function ConnectionsScreen() {
           </div>
         )}
 
-        {status !== "error" && (!model || !view || !rec) && <p className="animate-soft-pulse mt-8 text-[13px] text-muted">Armando el mapa…</p>}
+        {clueCount > 0 && status !== "error" && (!model || !view || !rec) && <p className="animate-soft-pulse mt-8 text-[13px] text-muted">Armando el mapa…</p>}
 
         {model && view && rec && (
           <>

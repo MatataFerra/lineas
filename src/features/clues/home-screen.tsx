@@ -33,13 +33,13 @@ export function HomeScreen() {
       <div className="flex min-w-0 flex-1 flex-col px-[22px] pt-5 pb-7 md:px-16 md:pt-7 md:pb-8">
         <SiteHeader />
 
-        <main className="mt-12 max-w-[720px] md:mt-24">
-          <h1 className="font-serif text-[38px] leading-[1.08] tracking-[-0.015em] md:text-[58px] md:leading-[1.06]">
+        <main className="mt-12 w-full max-w-[1240px] md:mt-20 lg:mt-24">
+          <h1 className="font-serif text-[38px] leading-[1.08] tracking-[-0.015em] md:text-[58px] md:leading-[1.06] xl:text-[68px]">
             No sabés qué leer.
             <br />
             Pero sabés qué te mueve.
           </h1>
-          <p className="mt-4 text-[15px] leading-relaxed text-muted md:mt-5 md:text-base">
+          <p className="mt-4 max-w-[60ch] text-[15px] leading-relaxed text-muted md:mt-5 md:text-base">
             Un libro, una frase, una idea, una época.
             <br className="hidden md:block" /> Contanos qué te inspira y encontramos tu próxima lectura.
           </p>
@@ -62,38 +62,40 @@ export function HomeScreen() {
               placeholder="¿Qué libros, ideas o historias te inspiran?"
               className="bg-transparent py-1 text-base outline-none placeholder:text-muted md:text-[15px]"
             />
-            <div className="flex flex-wrap items-center gap-2 md:gap-2.5">
-              {clues.map((clue) => (
-                <span
-                  key={clue.id}
-                  title={CLUE_KIND_META[clue.kind].label}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-chip pr-0.5 pl-2.5 text-[13px] md:pl-3"
+            {/* Las pistas se acomodan en filas; la flecha queda siempre a la derecha, abajo. */}
+            <div className="flex items-end gap-3">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 md:gap-2.5">
+                {clues.map((clue) => (
+                  <span
+                    key={clue.id}
+                    title={CLUE_KIND_META[clue.kind].label}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-chip pr-0.5 pl-2.5 text-[13px] md:pl-3"
+                  >
+                    <ClueKindIcon kind={clue.kind} size={14} className="text-muted" />
+                    {clue.label}
+                    <button type="button" aria-label={`Quitar ${clue.label}`} onClick={() => removeClue(clue.id)} className="flex size-[30px] items-center justify-center text-muted hover:text-ink">
+                      <CloseIcon size={12} strokeWidth={2} />
+                    </button>
+                  </span>
+                ))}
+                <button
+                  type="button"
+                  aria-label="Añadir pista"
+                  onClick={() => setDialogKind("book")}
+                  className="flex size-9 items-center justify-center rounded-lg text-ink hover:bg-chip"
                 >
-                  <ClueKindIcon kind={clue.kind} size={14} className="text-muted" />
-                  {clue.label}
-                  <button type="button" aria-label={`Quitar ${clue.label}`} onClick={() => removeClue(clue.id)} className="flex size-[30px] items-center justify-center text-muted hover:text-ink">
-                    <CloseIcon size={12} strokeWidth={2} />
-                  </button>
-                </span>
-              ))}
-              <button
-                type="button"
-                aria-label="Añadir pista"
-                onClick={() => setDialogKind("book")}
-                className="flex size-9 items-center justify-center rounded-lg text-ink hover:bg-chip"
-              >
-                <PlusIcon size={16} />
-              </button>
-              <div className="flex-1" />
-              <button
-                type="button"
-                aria-label="Buscar lecturas"
-                onClick={go}
-                disabled={clues.length === 0}
-                className="flex size-11 items-center justify-center rounded-full bg-accent text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-40"
-              >
-                <ArrowRightIcon />
-              </button>
+                  <PlusIcon size={16} />
+                </button>
+              </div>
+                <button
+                  type="button"
+                  aria-label="Buscar lecturas"
+                  onClick={go}
+                  disabled={clues.length === 0}
+                  className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-40"
+                >
+                  <ArrowRightIcon />
+                </button>
             </div>
           </div>
 
