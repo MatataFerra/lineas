@@ -5,7 +5,7 @@ import { useState } from "react";
 import { ArrowRightIcon, ClueKindIcon, CloseIcon, PlusIcon } from "@/components/icons";
 import { SiteHeader } from "@/components/site-header";
 import { CLUE_KIND_META } from "@/lib/graph/labels";
-import type { ClueKind } from "@/lib/graph/schema";
+import { MAX_CLUES, type ClueKind } from "@/lib/graph/schema";
 import { useLineas } from "@/lib/store";
 import { STARTER_IDEAS } from "./catalog";
 import { ClueDialog } from "./clue-dialog";
@@ -19,6 +19,7 @@ export function HomeScreen() {
 
   const [draft, setDraft] = useState("");
   const [dialogKind, setDialogKind] = useState<ClueKind | null>(null);
+  const full = clues.length >= MAX_CLUES;
 
   const go = () => {
     if (clues.length === 0) return;
@@ -59,7 +60,8 @@ export function HomeScreen() {
                   setDraft("");
                 }
               }}
-              placeholder="¿Qué libros, ideas o historias te inspiran?"
+              disabled={full}
+              placeholder={full ? `Llegaste a ${MAX_CLUES} pistas. Quitá una para sumar otra.` : "¿Qué libros, ideas o historias te inspiran?"}
               className="bg-transparent py-1 text-base outline-none placeholder:text-muted md:text-[15px]"
             />
             {/* Las pistas se acomodan en filas; la flecha queda siempre a la derecha, abajo. */}
@@ -78,31 +80,34 @@ export function HomeScreen() {
                     </button>
                   </span>
                 ))}
-                <button
-                  type="button"
-                  aria-label="Añadir pista"
-                  onClick={() => setDialogKind("book")}
-                  className="flex size-9 items-center justify-center rounded-lg text-ink hover:bg-chip"
-                >
-                  <PlusIcon size={16} />
-                </button>
+                {!full && (
+                  <button
+                    type="button"
+                    aria-label="Añadir pista"
+                    onClick={() => setDialogKind("book")}
+                    className="flex size-9 items-center justify-center rounded-lg text-ink hover:bg-chip"
+                  >
+                    <PlusIcon size={16} />
+                  </button>
+                )}
               </div>
-                <button
-                  type="button"
-                  aria-label="Buscar lecturas"
-                  onClick={go}
-                  disabled={clues.length === 0}
-                  className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-40"
-                >
-                  <ArrowRightIcon />
-                </button>
+              <button
+                type="button"
+                aria-label="Buscar lecturas"
+                onClick={go}
+                disabled={clues.length === 0}
+                className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-40"
+              >
+                <ArrowRightIcon />
+              </button>
             </div>
           </div>
 
           <button
             type="button"
             onClick={() => setDialogKind("book")}
-            className="mt-2 inline-flex items-center gap-2 py-3 text-[13px] font-medium text-accent md:mt-3 md:py-2 md:font-normal md:text-muted md:hover:text-ink"
+            disabled={full}
+            className="mt-2 inline-flex disabled:pointer-events-none disabled:opacity-0 items-center gap-2 py-3 text-[13px] font-medium text-accent md:mt-3 md:py-2 md:font-normal md:text-muted md:hover:text-ink"
           >
             <PlusIcon size={12} strokeWidth={2.2} />
             Añadir otra pista
@@ -115,7 +120,8 @@ export function HomeScreen() {
                 key={idea.label}
                 type="button"
                 onClick={() => addClue(idea.label, idea.kind)}
-                className="h-[38px] rounded-full border border-line px-4 text-[13px] hover:bg-chip md:px-[18px]"
+                disabled={full}
+                className="h-[38px] rounded-full border border-line px-4 text-[13px] hover:bg-chip disabled:opacity-40 disabled:hover:bg-transparent md:px-[18px]"
               >
                 {idea.label}
               </button>

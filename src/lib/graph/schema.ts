@@ -37,6 +37,9 @@ export const ClueKindSchema = z.enum([
 ]);
 export type ClueKind = z.infer<typeof ClueKindSchema>;
 
+/** Con más pistas el pedido se diluye: el mapa pierde foco y cada carril cuesta más. */
+export const MAX_CLUES = 5;
+
 export const ClueSchema = z.object({
   id: z.string().min(1),
   kind: ClueKindSchema,

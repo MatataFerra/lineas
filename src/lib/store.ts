@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { authorOf, mergeLaneGraphs, recommendedBook } from "@/lib/graph/merge";
 import { indexGraph, pathEdges } from "@/lib/graph/queries";
-import { LaneSchema, type Clue, type ClueKind, type ConnectionGraph, type GraphEdge, type GraphNode, type Lane } from "@/lib/graph/schema";
+import { LaneSchema, MAX_CLUES, type Clue, type ClueKind, type ConnectionGraph, type GraphEdge, type GraphNode, type Lane } from "@/lib/graph/schema";
 import { readEventStream, type ExcludedBook, type StreamEvent } from "@/lib/recommend/events";
 import { getBrowserSupabase } from "@/lib/supabase/client";
 import type { Enums, Json } from "@/lib/supabase/database.types";
@@ -144,7 +144,7 @@ export const useLineas = create<LineasState>()((set, get) => ({
 
   addClue: (label, kind) => {
     const clean = label.trim();
-    if (!clean || get().hasClue(clean)) return;
+    if (!clean || get().hasClue(clean) || get().clues.length >= MAX_CLUES) return;
     set((s) => ({ clues: [...s.clues, { id: newId(), kind, label: clean }] }));
   },
 

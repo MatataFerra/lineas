@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { BookRefSchema, ClueSchema, LaneSchema, laneGraphSchema, type BookRef, type ConnectionGraph, type Lane } from "@/lib/graph/schema";
+import { BookRefSchema, ClueSchema, LaneSchema, MAX_CLUES, laneGraphSchema, type BookRef, type ConnectionGraph, type Lane } from "@/lib/graph/schema";
 
 /**
  * Lo que viaja de /api/recommend al navegador: una línea JSON por evento
@@ -23,7 +23,7 @@ export const ExcludedBookSchema = z.object({
 export type ExcludedBook = z.infer<typeof ExcludedBookSchema>;
 
 export const RecommendRequestSchema = z.object({
-  clues: z.array(ClueSchema).min(1, "Agregá al menos una pista").max(12),
+  clues: z.array(ClueSchema).min(1, "Agregá al menos una pista").max(MAX_CLUES, `Hasta ${MAX_CLUES} pistas`),
   /** Sin carril: los tres. Con carril: "ver otra" de ese carril. */
   lane: LaneSchema.optional(),
   exclude: z.array(ExcludedBookSchema).max(40).default([]),

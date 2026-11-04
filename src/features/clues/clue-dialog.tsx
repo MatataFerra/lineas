@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { BookCover } from "@/components/book-cover";
 import { ArrowRightIcon, CheckIcon, ClueKindIcon, CloseIcon, PlusIcon, SearchIcon } from "@/components/icons";
 import { CLUE_KIND_META, CLUE_KIND_ORDER } from "@/lib/graph/labels";
-import type { ClueKind } from "@/lib/graph/schema";
+import { MAX_CLUES, type ClueKind } from "@/lib/graph/schema";
 import { useLineas } from "@/lib/store";
 import { DESKTOP_QUERY, useMediaQuery } from "@/lib/use-media-query";
 import { searchCatalog, type CatalogItem } from "./catalog";
@@ -45,6 +45,7 @@ export function ClueDialog({ initialKind = "book", onClose, onSearch }: ClueDial
   const exact = results.some((r) => r.label.toLowerCase() === trimmed.toLowerCase());
   const meta = CLUE_KIND_META[kind];
   const isChosen = (label: string) => clues.some((c) => c.label.toLowerCase() === label.toLowerCase());
+  const full = clues.length >= MAX_CLUES;
 
   // Elegir no cierra el modal: se pueden sumar varias pistas seguidas y quitar las que sobran.
   const pick = (label: string) => {
@@ -97,7 +98,7 @@ export function ClueDialog({ initialKind = "book", onClose, onSearch }: ClueDial
         <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto pt-4 pb-6 md:mt-5 md:grid md:grid-cols-[280px_minmax(0,1fr)] md:gap-7 md:overflow-visible md:p-0">
           {/* Pistas actuales (mobile) */}
           <div className="md:hidden">
-            <div className="px-5 text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">Tus pistas · {clues.length}</div>
+            <div className="px-5 text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">Tus pistas · {clues.length} de {MAX_CLUES}</div>
             <div className="no-scrollbar mt-2.5 flex gap-2 overflow-x-auto px-5">
               {clues.length === 0 && <span className="text-[13px] text-muted">Todavía no agregaste ninguna.</span>}
               {clues.map((clue) => (
@@ -156,7 +157,7 @@ export function ClueDialog({ initialKind = "book", onClose, onSearch }: ClueDial
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && trimmed) {
+                  if (e.key === "Enter" && trimmed && !full) {
                     e.preventDefault();
                     pick(results[0]?.label ?? trimmed);
                   }
@@ -171,7 +172,8 @@ export function ClueDialog({ initialKind = "book", onClose, onSearch }: ClueDial
             </div>
 
             <div className="mt-2.5 flex flex-col md:mt-0 md:max-h-[360px] md:gap-0.5 md:overflow-y-auto">
-              {trimmed && !exact && (
+              {full && <p className="mb-2 rounded-xl bg-chip px-3.5 py-3 text-[13px]">Llegaste a {MAX_CLUES} pistas. Quitá una para sumar otra.</p>}
+              {trimmed && !exact && !full && (
                 <button
                   type="button"
                   onClick={() => pick(trimmed)}
@@ -182,7 +184,7 @@ export function ClueDialog({ initialKind = "book", onClose, onSearch }: ClueDial
                 </button>
               )}
               {results.map((item) => (
-                <ResultRow key={item.label} item={item} kind={kind} chosen={isChosen(item.label)} onPick={() => pick(item.label)} />
+                <ResultRow key={item.label} item={item} kind={kind} chosen={isChosen(item.label)} disabled={full && !isChosen(item.label)} onPick={() => pick(item.label)} />
               ))}
               {trimmed && results.length === 0 && (
                 <p className="mt-2 text-[13px] text-muted">No encontramos coincidencias. Podés agregarla igual como pista.</p>
@@ -225,7 +227,7 @@ export function ClueDialog({ initialKind = "book", onClose, onSearch }: ClueDial
   );
 }
 
-function ResultRow({ item, kind, chosen, onPick }: { item: CatalogItem; kind: ClueKind; chosen: boolean; onPick: () => void }) {
+function ResultRow({ item, kind, chosen, disabled, onPick }: { item: CatalogItem; kind: ClueKind; chosen: boolean; disabled: boolean; onPick: () => void }) {
   const words = item.label.split(" ");
   const initials = words[0].charAt(0) + (words.length > 1 ? words[words.length - 1].charAt(0) : "");
   return (
@@ -233,7 +235,8 @@ function ResultRow({ item, kind, chosen, onPick }: { item: CatalogItem; kind: Cl
       type="button"
       onClick={onPick}
       aria-pressed={chosen}
-      className="flex items-center gap-3.5 border-b border-line py-2.5 text-left md:rounded-[10px] md:border-0 md:px-3 md:py-2 md:hover:bg-chip/60"
+      disabled={disabled}
+      className="flex items-center gap-3.5 border-b border-line py-2.5 text-left disabled:opacity-40 md:rounded-[10px] md:border-0 md:px-3 md:py-2 md:enabled:hover:bg-chip/60"
     >
       {kind === "book" ? (
         <BookCover id={item.label} title={item.label} size="sm" />
