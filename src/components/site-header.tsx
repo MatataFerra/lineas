@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getBrowserSupabase } from "@/lib/supabase/client";
 import { useLineas } from "@/lib/store";
 import { MenuIcon, UserIcon } from "./icons";
@@ -19,6 +19,20 @@ export function SiteHeader() {
   const user = useLineas((s) => s.user);
   const authReady = useLineas((s) => s.authReady);
   const [menu, setMenu] = useState<"nav" | "account" | null>(null);
+  const header = useRef<HTMLElement>(null);
+
+  // Un menú abierto se cierra con Escape o con un clic fuera del encabezado.
+  useEffect(() => {
+    if (!menu) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenu(null);
+    const onPointer = (e: PointerEvent) => !header.current?.contains(e.target as Node) && setMenu(null);
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+    };
+  }, [menu]);
 
   const loginHref = `/ingresar?next=${encodeURIComponent(pathname)}`;
   const signOut = async () => {
@@ -28,7 +42,7 @@ export function SiteHeader() {
   };
 
   return (
-    <header className="relative flex items-center justify-between gap-6" style={{ viewTransitionName: "site-header" }}>
+    <header ref={header} className="relative flex items-center justify-between gap-6">
       <Link href="/" className="font-serif text-[26px] tracking-[-0.01em] md:text-[28px]">
         Líneas
       </Link>

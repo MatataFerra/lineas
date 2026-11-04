@@ -1,6 +1,4 @@
-"use client";
-
-import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 /**
  * La franja del costado de la home. De entre las páginas de un libro abierto
@@ -8,25 +6,14 @@ import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
  * hacia lo que inspira (la noche, la música, un pájaro de papel, las
  * estrellas) hasta un sol, el mismo centro que tiene el mapa.
  *
- * El tallo es una cadena de tres tramos articulados. Cada articulación es un
- * resorte: la planta se mece sola y se inclina hacia el cursor, con los
- * tramos de arriba llegando un poco tarde, como una planta de verdad. Lo que
- * cuelga de cada tramo (ramas, escenas, el sol) lo acompaña.
- *
- * Al cargar, todo se dibuja de abajo hacia arriba (clases art-* en
+ * Al cargar, todo se dibuja de abajo hacia arriba; después las escenas tienen
+ * su propio pulso y las páginas del libro respiran (clases art-* en
  * globals.css). Con movimiento reducido queda quieta y completa.
  */
 
 type Pt = [number, number];
 /** Un tramo cúbico: inicio, dos controles y fin. */
 type Cubic = [Pt, Pt, Pt, Pt];
-
-// Las tres articulaciones del tallo: el pliegue del libro y dos nudos.
-const JOINTS: Pt[] = [
-  [100, 712],
-  [104, 552],
-  [128, 370],
-];
 
 const STEM: Cubic[][] = [
   [
@@ -59,12 +46,8 @@ const BRANCH: Record<"moon" | "music" | "bird" | "stars", Cubic> = {
 const delay = (s: number) => ({ "--delay": `${s}s` }) as CSSProperties;
 
 export function InspirationArt() {
-  const box = useRef<HTMLDivElement>(null);
-  const joints = useRef<(SVGGElement | null)[]>([]);
-  useSpringyStem(box, joints);
-
   return (
-    <div ref={box} className="relative hidden max-w-[260px] flex-[0_0_18%] overflow-hidden md:block" aria-hidden="true" style={{ viewTransitionName: "home-art" }}>
+    <div className="relative hidden max-w-[260px] flex-[0_0_18%] overflow-hidden md:block" aria-hidden="true">
       <svg viewBox="0 0 200 820" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 size-full">
         <defs>
           <radialGradient id="art-glow">
@@ -142,13 +125,13 @@ export function InspirationArt() {
           ))}
         </g>
 
-        {/* La planta: tres tramos, cada uno anidado en el anterior. */}
-        <g ref={(el) => void (joints.current[0] = el)}>
+        {/* La planta, en tres tramos de tallo con lo que sale de cada uno. */}
+        <g>
           <Tapered segments={STEM[0]} widths={STEM_WIDTH[0]} mask="art-reveal-0" />
           <Leaf at={[100, 636]} angle={-140} d={0.75} />
           <Leaf at={[100, 636]} angle={-28} d={0.85} small />
 
-          <g ref={(el) => void (joints.current[1] = el)}>
+          <g>
             <Tapered segments={STEM[1]} widths={STEM_WIDTH[1]} mask="art-reveal-1" />
             <Tapered segments={[BRANCH.moon]} widths={[2, 0.7]} mask="art-reveal-moon" />
             <Tapered segments={[BRANCH.music]} widths={[1.8, 0.7]} mask="art-reveal-music" />
@@ -156,7 +139,7 @@ export function InspirationArt() {
             <Moon />
             <Music />
 
-            <g ref={(el) => void (joints.current[2] = el)}>
+            <g>
               <Tapered segments={STEM[2]} widths={STEM_WIDTH[2]} mask="art-reveal-2" />
               <Tapered segments={[BRANCH.bird]} widths={[1.8, 0.7]} mask="art-reveal-bird" />
               <Tapered segments={[BRANCH.stars]} widths={[1.5, 0.6]} mask="art-reveal-stars" />
@@ -189,67 +172,6 @@ export function InspirationArt() {
       </svg>
     </div>
   );
-}
-
-/* ------------------------------------------------------------------ */
-/* Movimiento: resortes en cada articulación                           */
-/* ------------------------------------------------------------------ */
-
-function useSpringyStem(box: React.RefObject<HTMLDivElement | null>, joints: React.RefObject<(SVGGElement | null)[]>) {
-  useEffect(() => {
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    // Cuánto del giro total toma cada articulación, y qué tan rígida es: las de arriba, más blandas, llegan tarde.
-    const share = [0.4, 0.35, 0.25];
-    const stiffness = [70, 48, 32];
-    const damping = [9, 7, 5.5];
-    const angle = [0, 0, 0];
-    const speed = [0, 0, 0];
-    let lean = 0;
-    let lastX: number | null = null;
-    let frame = 0;
-    let last = performance.now();
-    const start = last;
-
-    const onMove = (e: PointerEvent) => {
-      const rect = box.current?.getBoundingClientRect();
-      if (!rect) return;
-      const cx = rect.left + rect.width / 2;
-      // Se inclina hacia el cursor; más si el cursor está cerca de la planta.
-      const near = e.clientX < rect.right + 160 ? 1 : 0.45;
-      lean = Math.max(-1, Math.min(1, (e.clientX - cx) / 260)) * 9 * near;
-      // Un movimiento rápido le da un golpe de viento.
-      if (lastX !== null) speed[2] += Math.max(-40, Math.min(40, (e.clientX - lastX) * 0.9 * near));
-      lastX = e.clientX;
-    };
-    const onLeave = () => {
-      lean = 0;
-      lastX = null;
-    };
-
-    const tick = (now: number) => {
-      const dt = Math.min(0.033, (now - last) / 1000);
-      last = now;
-      const t = (now - start) / 1000;
-      const breeze = Math.sin(t * 0.7) * 1.2 + Math.sin(t * 1.9) * 0.35;
-      angle.forEach((a, i) => {
-        const target = (lean + breeze) * share[i];
-        speed[i] += (stiffness[i] * (target - a) - damping[i] * speed[i]) * dt;
-        angle[i] = a + speed[i] * dt;
-        const [x, y] = JOINTS[i];
-        joints.current[i]?.setAttribute("transform", `rotate(${angle[i].toFixed(3)} ${x} ${y})`);
-      });
-      frame = requestAnimationFrame(tick);
-    };
-
-    window.addEventListener("pointermove", onMove, { passive: true });
-    document.documentElement.addEventListener("pointerleave", onLeave);
-    frame = requestAnimationFrame(tick);
-    return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener("pointermove", onMove);
-      document.documentElement.removeEventListener("pointerleave", onLeave);
-    };
-  }, [box, joints]);
 }
 
 /* ------------------------------------------------------------------ */
@@ -307,24 +229,27 @@ function Book() {
       <ellipse cx="100" cy="772" rx="104" ry="12" fill="url(#art-shadow)" />
       {/* Tapa: un filo de tela que asoma. */}
       <path d="M100 722 C 78 708, 44 704, 6 709 L 3 766 C 44 760, 78 764, 100 773 C 122 764, 156 760, 197 766 L 194 709 C 156 704, 122 708, 100 722 Z" className="fill-[#6e2a1f] dark:fill-[#5a2118]" />
-      {/* Hojas debajo de la de arriba: el grosor del libro. */}
-      {[4, 2.5, 1].map((k) => (
-        <g key={k} className="fill-[#e9e1d3] dark:fill-[#3a352e]">
-          <path d={left} transform={`translate(${-k * 0.9} ${k * 1.5})`} />
-          <path d={right} transform={`translate(${k * 0.9} ${k * 1.5})`} />
-        </g>
-      ))}
-      <path d={left} fill="url(#art-page-l)" />
-      <path d={right} fill="url(#art-page-r)" />
-      {/* Renglones apenas marcados. */}
-      <g fill="none" strokeLinecap="round" strokeWidth="0.55" className="stroke-ink/20">
-        {[0, 1, 2, 3, 4].map((i) => (
-          <g key={i}>
-            <path d={`M${24 + (i === 4 ? 0 : 0)} ${716 + i * 8} C 46 ${709 + i * 8}, 70 ${710 + i * 8}, ${i === 2 ? 80 : 90} ${717 + i * 8}`} />
-            <path d={`M${i === 3 ? 122 : 110} ${717 + i * 8} C 130 ${710 + i * 8}, 154 ${709 + i * 8}, 176 ${716 + i * 8}`} />
+      {/* Cada mitad, con sus hojas de abajo (el grosor) y sus renglones, se abre y se cierra apenas. */}
+      {(["l", "r"] as const).map((side) => {
+        const dir = side === "l" ? -1 : 1;
+        return (
+          <g key={side} className={`art-page art-page-${side}`}>
+            {[4, 2.5, 1].map((k) => (
+              <path key={k} d={side === "l" ? left : right} transform={`translate(${dir * k * 0.9} ${k * 1.5})`} className="fill-[#e9e1d3] dark:fill-[#3a352e]" />
+            ))}
+            <path d={side === "l" ? left : right} fill={`url(#art-page-${side})`} />
+            <g fill="none" strokeLinecap="round" strokeWidth="0.55" className="stroke-ink/20">
+              {[0, 1, 2, 3, 4].map((i) =>
+                side === "l" ? (
+                  <path key={i} d={`M24 ${716 + i * 8} C 46 ${709 + i * 8}, 70 ${710 + i * 8}, ${i === 2 ? 80 : 90} ${717 + i * 8}`} />
+                ) : (
+                  <path key={i} d={`M${i === 3 ? 122 : 110} ${717 + i * 8} C 130 ${710 + i * 8}, 154 ${709 + i * 8}, 176 ${716 + i * 8}`} />
+                ),
+              )}
+            </g>
           </g>
-        ))}
-      </g>
+        );
+      })}
       {/* Una página a medio pasar, que se mueve con la brisa. */}
       <g className="art-turn">
         <path d="M100 713 C 112 694, 134 682, 160 682 C 162 702, 160 724, 154 744 C 134 742, 114 750, 100 767 Z" fill="url(#art-turn)" />
