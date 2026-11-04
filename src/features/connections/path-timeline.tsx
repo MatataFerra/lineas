@@ -5,6 +5,8 @@ import { coverColors } from "@/components/book-cover";
 import { ChevronDownIcon } from "@/components/icons";
 import { describeTimeJump, otherEnd } from "@/lib/graph/queries";
 import { EDGE_META } from "@/lib/graph/labels";
+import { VoteControl } from "@/components/vote-control";
+import { edgeKey, useLineas } from "@/lib/store";
 import { ConfidenceBadge, EdgeTypeBadge } from "./connection-badges";
 import type { GraphModel, ViewState } from "./model";
 
@@ -15,6 +17,8 @@ import type { GraphModel, ViewState } from "./model";
 export function PathTimeline({ model, view }: { model: GraphModel; view: ViewState }) {
   const { index } = model;
   const [open, setOpen] = useState<string | null>(null);
+  const edgeVotes = useLineas((s) => s.edgeVotes);
+  const voteEdge = useLineas((s) => s.voteEdge);
   const pathEdgeIds = new Set(view.steps.map((e) => e.id));
 
   return (
@@ -91,6 +95,7 @@ export function PathTimeline({ model, view }: { model: GraphModel; view: ViewSta
                   <div className="mt-1.5">
                     <ConfidenceBadge confidence={edge.confidence} />
                   </div>
+                  <VoteControl question="¿Te convence?" value={edgeVotes[edgeKey(edge)]} onVote={(v) => void voteEdge(edge, v)} className="mt-3" />
                 </div>
               )}
             </div>

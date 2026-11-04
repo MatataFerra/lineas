@@ -3,7 +3,8 @@
 import { ArrowLeftIcon } from "@/components/icons";
 import { LANE_META, NODE_KIND_LABEL } from "@/lib/graph/labels";
 import { otherEnd } from "@/lib/graph/queries";
-import { bookSnapshot, useLineas } from "@/lib/store";
+import { VoteControl } from "@/components/vote-control";
+import { bookSnapshot, edgeKey, useLineas } from "@/lib/store";
 import { LibraryNotice } from "@/features/library/library-notice";
 import { ConfidenceBadge, EdgeTypeBadge } from "./connection-badges";
 import type { GraphModel, Selection, ViewState } from "./model";
@@ -21,6 +22,8 @@ export function PathPanel({ model, view, selection, onSelect, laneDot }: PathPan
   const { index, graph } = model;
   const library = useLineas((s) => s.library);
   const toggleLibrary = useLineas((s) => s.toggleLibrary);
+  const edgeVotes = useLineas((s) => s.edgeVotes);
+  const voteEdge = useLineas((s) => s.voteEdge);
   const back = () => onSelect({ kind: "path" });
 
   if (selection.kind === "node") {
@@ -74,6 +77,7 @@ export function PathPanel({ model, view, selection, onSelect, laneDot }: PathPan
         </p>
         {edge.quote && <blockquote className="mt-4 border-l-0 font-serif text-lg leading-snug italic">«{edge.quote}»</blockquote>}
         <p className="mt-4 text-sm leading-relaxed">{edge.explanation}</p>
+        <VoteControl question="¿Te convence esta conexión?" value={edgeVotes[edgeKey(edge)]} onVote={(v) => void voteEdge(edge, v)} className="mt-5" />
       </div>
     );
   }
@@ -107,6 +111,7 @@ export function PathPanel({ model, view, selection, onSelect, laneDot }: PathPan
                 <ConfidenceBadge confidence={edge.confidence} />
               </div>
               <p className="mt-1.5 text-[13px] leading-relaxed">{edge.explanation}</p>
+              <VoteControl question="¿Te convence?" value={edgeVotes[edgeKey(edge)]} onVote={(v) => void voteEdge(edge, v)} className="mt-2" />
             </div>
           </li>
         ))}

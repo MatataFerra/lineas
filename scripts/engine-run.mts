@@ -4,9 +4,10 @@
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { verifyGraphBooks, type LookupReport } from "@/lib/catalog/books";
-import { ClueKindSchema, type Clue, type ConnectionGraph } from "@/lib/graph/schema";
+import { mergeLaneGraphs } from "@/lib/graph/merge";
+import { ClueKindSchema, LaneSchema, type Clue, type ConnectionGraph, type Lane } from "@/lib/graph/schema";
 import type { LlmConfig, LlmUsage } from "@/lib/recommend/llm-client";
-import { generateGraphWithLlm, type LlmEvent } from "@/lib/recommend/llm-engine";
+import { generateLaneWithLlm, type LlmEvent } from "@/lib/recommend/llm-engine";
 import { graphQuality, type GraphQuality } from "@/lib/recommend/quality";
 
 export const DEFAULT_CLUES = ["book:On the Road", "movement:Generación Beat", "feeling:La libertad"];
@@ -28,65 +29,78 @@ export interface RunResult {
   error?: string;
   model?: string;
   attempts: number;
+  /** Cuándo estuvo listo el primer carril (modelo + verificación): lo que siente el usuario. */
+  firstLaneMs: number;
+  /** El carril más lento, solo modelo. */
   llmMs: number;
   totalMs: number;
+  laneMs: Partial<Record<Lane, number>>;
+  failedLanes: Lane[];
   usage: { input: number; cached: number; output: number; costUsd?: number };
   generated?: ConnectionGraph;
   graph?: ConnectionGraph;
   quality?: GraphQuality;
   misses: LookupReport[];
-  events: LlmEvent[];
+  events: (LlmEvent & { lane: Lane })[];
 }
 
-export async function runEngine(clues: Clue[], config: LlmConfig, onEvent?: (e: LlmEvent) => void): Promise<RunResult> {
-  const events: LlmEvent[] = [];
+/** Corre los tres carriles en paralelo, como la app, y mide cada uno. */
+export async function runEngine(clues: Clue[], config: LlmConfig, onEvent?: (e: LlmEvent & { lane: Lane }) => void): Promise<RunResult> {
+  const events: RunResult["events"] = [];
   const misses: LookupReport[] = [];
   const started = Date.now();
-  let usage: LlmUsage[] = [];
+  const usage: LlmUsage[] = [];
+  const laneMs: RunResult["laneMs"] = {};
+  const failedLanes: Lane[] = [];
+  const errors: string[] = [];
   let model: string | undefined;
   let llmMs = 0;
+  let firstLaneMs = 0;
 
-  try {
-    const generated = await generateGraphWithLlm(clues, {
-      ...config,
-      log: (event) => {
-        events.push(event);
-        if (event.type === "success") {
-          usage = event.usage;
-          model = event.model;
-        }
-        onEvent?.(event);
-      },
-    });
-    llmMs = Date.now() - started;
-    const graph = await verifyGraphBooks(generated, { googleBooksKey: process.env.GOOGLE_BOOKS_API_KEY, onMiss: (r) => misses.push(r) });
-    return {
-      config,
-      ok: true,
-      model,
-      attempts: events.filter((e) => e.type === "attempt").length,
-      llmMs,
-      totalMs: Date.now() - started,
-      usage: sumUsage(usage),
-      generated,
-      graph,
-      quality: graphQuality(graph),
-      misses,
-      events,
-    };
-  } catch (error) {
-    return {
-      config,
-      ok: false,
-      error: error instanceof Error ? error.message : String(error),
-      attempts: events.filter((e) => e.type === "attempt").length,
-      llmMs: llmMs || Date.now() - started,
-      totalMs: Date.now() - started,
-      usage: sumUsage(usage),
-      misses,
-      events,
-    };
-  }
+  const results = await Promise.all(
+    LaneSchema.options.map(async (lane) => {
+      try {
+        const generated = await generateLaneWithLlm(
+          { clues, lane },
+          {
+            ...config,
+            log: (event) => {
+              events.push({ ...event, lane });
+              if (event.type === "success") {
+                usage.push(...event.usage);
+                model = event.model;
+              }
+              onEvent?.({ ...event, lane });
+            },
+          },
+        );
+        llmMs = Math.max(llmMs, Date.now() - started);
+        const graph = await verifyGraphBooks(generated, { googleBooksKey: process.env.GOOGLE_BOOKS_API_KEY, onlyRecommended: true, onMiss: (r) => misses.push(r) });
+        laneMs[lane] = Date.now() - started;
+        firstLaneMs ||= laneMs[lane];
+        return { generated, graph };
+      } catch (error) {
+        failedLanes.push(lane);
+        errors.push(`${lane}: ${error instanceof Error ? error.message : String(error)}`);
+        return null;
+      }
+    }),
+  );
+
+  const ok = results.filter((r) => r !== null);
+  const base = { config, model, attempts: events.filter((e) => e.type === "attempt").length, firstLaneMs, llmMs, laneMs, failedLanes, usage: sumUsage(usage), misses, events };
+  if (ok.length === 0) return { ...base, ok: false, error: errors.join(" · "), totalMs: Date.now() - started };
+  const generated = mergeLaneGraphs(clues, ok.map((r) => r.generated));
+  const graph = mergeLaneGraphs(clues, ok.map((r) => r.graph));
+  return {
+    ...base,
+    ok: failedLanes.length === 0,
+    ...(errors.length ? { error: errors.join(" · ") } : {}),
+    totalMs: Date.now() - started,
+    generated,
+    graph,
+    quality: graphQuality(graph),
+  };
 }
 
 function sumUsage(usage: LlmUsage[]) {

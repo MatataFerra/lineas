@@ -8,15 +8,33 @@ import { GRAPH_LIMITS, type Clue } from "@/lib/graph/schema";
  * cambia el sentido (un recorrido roto, un carril vacío) se deja para que la
  * validación lo rechace y el modelo lo corrija en el reintento.
  */
-export function normalizeRawGraph(raw: unknown, clues: Clue[]): unknown {
+export interface NormalizeOptions {
+  /** Máximo de nodos antes de recortar los que no están en ningún recorrido. */
+  maxNodes?: number;
+}
+
+/**
+ * Ids fijos para las pistas: el servidor los decide antes de llamar al modelo,
+ * así los carriles que se generan en paralelo nombran igual a cada pista y el
+ * mapa se puede unir.
+ */
+export function clueNodeIds(clues: Clue[]): { clue: Clue; id: string }[] {
+  return clues.map((clue) => ({ clue, id: slug(clue.label) })).filter((c) => c.id);
+}
+
+export function normalizeRawGraph(raw: unknown, clues: Clue[], { maxNodes = GRAPH_LIMITS.maxNodes }: NormalizeOptions = {}): unknown {
   if (!isRecord(raw)) return raw;
 
+  const fixedIds = new Set(clueNodeIds(clues).map((c) => c.id));
   const idMap = new Map<string, string>();
   const seenNodes = new Set<string>();
   const nodes = asArray(raw.nodes)
     .filter(isRecord)
     .map((node) => {
-      const id = slug(String(node.id ?? node.label ?? ""));
+      let id = slug(String(node.id ?? node.label ?? ""));
+      // Si el modelo nombró una pista con otro id pero con su mismo nombre, usamos el id fijo.
+      const byLabel = slug(String(node.label ?? ""));
+      if (!fixedIds.has(id) && fixedIds.has(byLabel)) id = byLabel;
       if (typeof node.id === "string") idMap.set(node.id, id);
       const kind = node.kind;
       const subtitle = typeof node.subtitle === "string" ? clip(node.subtitle, 60) : undefined;
@@ -27,7 +45,7 @@ export function normalizeRawGraph(raw: unknown, clues: Clue[]): unknown {
         label: clip(String(node.label ?? ""), 80),
         subtitle,
         ...(typeof node.originalTitle === "string" && node.originalTitle.trim() ? { originalTitle: clip(node.originalTitle, 120) } : { originalTitle: undefined }),
-        isClue: node.isClue === true,
+        isClue: node.isClue === true || fixedIds.has(id),
         era: normalizeEra(node.era),
         ...(book ? { book } : {}),
       };
@@ -83,7 +101,7 @@ export function normalizeRawGraph(raw: unknown, clues: Clue[]): unknown {
       pathSummary: clip(String(rec.pathSummary ?? ""), 240),
     }));
 
-  const pruned = pruneNodes(nodes, edges, recommendations);
+  const pruned = pruneNodes(nodes, edges, recommendations, maxNodes);
 
   const repaired = repairPaths(pruned.nodes, pruned.edges, recommendations);
 
@@ -155,6 +173,8 @@ type LooseEdge = Record<string, unknown> & { id: string; source: unknown; target
  * - libro → idea marcado como belongs_to → shared_theme: una novela no "pertenece"
  *   al desarraigo, lo comparte.
  * - una idea como origen de other_arts → shared_theme.
+ * - belongs_to hacia algo que no es un movimiento: invertido si va del movimiento
+ *   al libro; si no, shared_theme.
  */
 function retype<E extends LooseEdge>(edge: E, kindById: Map<string, string>): E {
   const sourceKind = kindById.get(String(edge.source));
@@ -165,6 +185,11 @@ function retype<E extends LooseEdge>(edge: E, kindById: Map<string, string>): E 
     if (sourceKind === "book" && targetKind === "person") return { ...edge, type: "authored", source: edge.target, target: edge.source };
   }
   if (type === "belongs_to" && (targetKind === "concept" || sourceKind === "concept")) return { ...edge, type: "shared_theme" };
+  if (type === "belongs_to" && targetKind !== "movement") {
+    // Escrito al revés (movimiento → libro): se invierte. Si no, es una afinidad, no una pertenencia.
+    if (sourceKind === "movement") return { ...edge, source: edge.target, target: edge.source };
+    return { ...edge, type: "shared_theme" };
+  }
   if (type === "other_arts" && (sourceKind === "concept" || targetKind === "concept")) return { ...edge, type: "shared_theme" };
   return edge;
 }
@@ -178,8 +203,9 @@ function pruneNodes<N extends { id: string; isClue: boolean }, E extends LooseEd
   nodes: N[],
   edges: E[],
   recommendations: { nodeId?: unknown; path?: unknown[] }[],
+  maxNodes: number,
 ): { nodes: N[]; edges: E[] } {
-  if (nodes.length <= GRAPH_LIMITS.maxNodes) return { nodes, edges };
+  if (nodes.length <= maxNodes) return { nodes, edges };
   const protectedIds = new Set<string>(nodes.filter((n) => n.isClue).map((n) => n.id));
   for (const rec of recommendations) {
     if (typeof rec.nodeId === "string") protectedIds.add(rec.nodeId);
@@ -189,7 +215,7 @@ function pruneNodes<N extends { id: string; isClue: boolean }, E extends LooseEd
   for (const e of edges) for (const end of [e.source, e.target]) degree.set(String(end), (degree.get(String(end)) ?? 0) + 1);
 
   const removable = nodes.filter((n) => !protectedIds.has(n.id)).sort((a, b) => (degree.get(a.id) ?? 0) - (degree.get(b.id) ?? 0));
-  const removed = new Set(removable.slice(0, nodes.length - GRAPH_LIMITS.maxNodes).map((n) => n.id));
+  const removed = new Set(removable.slice(0, nodes.length - maxNodes).map((n) => n.id));
   return {
     nodes: nodes.filter((n) => !removed.has(n.id)),
     edges: edges.filter((e) => !removed.has(String(e.source)) && !removed.has(String(e.target))),

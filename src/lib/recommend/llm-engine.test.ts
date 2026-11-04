@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { verifyGraphBooks } from "@/lib/catalog/books";
 import { MOCK_GRAPH } from "@/lib/graph/mock";
-import type { Clue } from "@/lib/graph/schema";
+import { laneSubgraph } from "@/lib/graph/merge";
+import { ConnectionGraphSchema, GRAPH_LIMITS, type Clue } from "@/lib/graph/schema";
 import { createRateLimiter } from "@/lib/rate-limit";
-import { EngineError, generateGraphWithLlm } from "./llm-engine";
+import { EngineError, generateLaneWithLlm } from "./llm-engine";
 import { normalizeRawGraph, repairPaths } from "./normalize";
 
 const CLUES: Clue[] = [
@@ -43,13 +44,23 @@ function fakeFetch(...replies: (Response | (() => Response))[]) {
 
 const base = { apiKey: "test-key", maxAttempts: 3 };
 
-describe("generateGraphWithLlm", () => {
-  it("devuelve el grafo validado y arma bien el pedido a DeepSeek", async () => {
-    const { fetch, calls } = fakeFetch(deepseekReply(modelOutput()));
-    const graph = await generateGraphWithLlm(CLUES, { ...base, fetch });
+/** Lo que devolvería el modelo para un carril: el recorrido de una recomendación del ejemplo. */
+function laneOutput(nodeId: string, mutate?: (g: Record<string, unknown>) => void): string {
+  const rec = MOCK_GRAPH.recommendations.find((r) => r.nodeId === nodeId)!;
+  const raw = structuredClone(laneSubgraph(MOCK_GRAPH, rec)) as unknown as Record<string, unknown>;
+  delete raw.clues;
+  for (const node of raw.nodes as Record<string, unknown>[]) delete node.book;
+  mutate?.(raw);
+  return JSON.stringify(raw);
+}
+
+describe("generateLaneWithLlm", () => {
+  it("devuelve el carril validado y arma bien el pedido a DeepSeek", async () => {
+    const { fetch, calls } = fakeFetch(deepseekReply(laneOutput("rayuela")));
+    const graph = await generateLaneWithLlm({ clues: CLUES, lane: "alternative" }, { ...base, fetch });
 
     expect(graph.clues).toEqual(CLUES);
-    expect(graph.recommendations).toHaveLength(9);
+    expect(graph.recommendations).toHaveLength(1);
     expect(graph.nodes.find((n) => n.id === "rayuela")?.book).toEqual({ author: "Julio Cortázar", verified: false });
 
     const [call] = calls;
@@ -61,87 +72,123 @@ describe("generateGraphWithLlm", () => {
     const messages = call.body.messages as { role: string; content: string }[];
     expect(messages[0].role).toBe("system");
     expect(messages[0].content).toContain("JSON");
-    expect(messages[1].content).toContain("- book: On the Road");
+    expect(messages[1].content).toContain('- book: On the Road → id "on-the-road"');
+    expect(messages[1].content).toContain("Carril: alternative");
+  });
+
+  it("incluye en el pedido los libros excluidos", async () => {
+    const { fetch, calls } = fakeFetch(deepseekReply(laneOutput("rayuela")));
+    await generateLaneWithLlm({ clues: CLUES, lane: "alternative", exclude: [{ title: "Fiesta", author: "Ernest Hemingway" }] }, { ...base, fetch });
+    const messages = calls[0].body.messages as { content: string }[];
+    expect(messages[1].content).toContain("- Fiesta (Ernest Hemingway)");
+  });
+
+  it("rechaza un carril que no es el pedido", async () => {
+    const { fetch, calls } = fakeFetch(deepseekReply(laneOutput("rayuela")), deepseekReply(laneOutput("el-extranjero")));
+    const graph = await generateLaneWithLlm({ clues: CLUES, lane: "beyond" }, { ...base, fetch });
+    expect(calls).toHaveLength(2);
+    expect(graph.recommendations[0].lane).toBe("beyond");
+  });
+
+  it("usa el id fijo de una pista aunque el modelo la nombre distinto", async () => {
+    const renamed = laneOutput("rayuela", (g) => {
+      const nodes = g.nodes as Record<string, unknown>[];
+      nodes.find((n) => n.id === "on-the-road")!.id = "en-el-camino";
+      for (const e of g.edges as Record<string, unknown>[]) for (const end of ["source", "target"]) if (e[end] === "on-the-road") e[end] = "en-el-camino";
+      const [rec] = g.recommendations as { path: string[] }[];
+      rec.path = rec.path.map((id) => (id === "on-the-road" ? "en-el-camino" : id));
+    });
+    const { fetch } = fakeFetch(deepseekReply(renamed));
+    const graph = await generateLaneWithLlm({ clues: CLUES, lane: "alternative" }, { ...base, fetch });
+    expect(graph.recommendations[0].path[0]).toBe("on-the-road");
+    expect(graph.nodes.find((n) => n.id === "on-the-road")?.isClue).toBe(true);
   });
 
   it("arregla un recorrido con un salto sin arista usando las aristas que existen, sin reintentar", async () => {
-    const broken = modelOutput((g) => {
-      const recs = g.recommendations as { nodeId: string; path: string[] }[];
-      recs[0].path = ["on-the-road", "siddhartha", recs[0].nodeId];
+    const broken = laneOutput("rayuela", (g) => {
+      const [rec] = g.recommendations as { path: string[] }[];
+      rec.path = ["generacion-beat", "charlie-parker", "rayuela"];
     });
     const events: string[] = [];
     const { fetch, calls } = fakeFetch(deepseekReply(broken));
-    const graph = await generateGraphWithLlm(CLUES, { ...base, fetch, log: (e) => events.push(e.type) });
+    const graph = await generateLaneWithLlm({ clues: CLUES, lane: "alternative" }, { ...base, fetch, log: (e) => events.push(e.type) });
 
     expect(calls).toHaveLength(1);
-    expect(graph.recommendations).toHaveLength(9);
+    expect(graph.recommendations[0].path).toEqual(["on-the-road", "charlie-parker", "rayuela"]);
     expect(events).not.toContain("salvaged");
   });
 
-  it("descarta una recomendación rota sin pagar otro intento si el carril sigue teniendo dos", async () => {
-    const broken = modelOutput((g) => {
-      const recs = g.recommendations as { nodeId: string; path: string[] }[];
-      recs[0].nodeId = "libro-inexistente";
-      recs[0].path = ["on-the-road", "libro-inexistente"];
+  it("descarta una arista rota sin pagar otro intento", async () => {
+    const broken = laneOutput("rayuela", (g) => {
+      (g.edges as Record<string, unknown>[]).push({ id: "loop", source: "rayuela", target: "rayuela", type: "shared_theme", confidence: "interpretive", summary: "s", explanation: "e" });
     });
     const events: string[] = [];
     const { fetch, calls } = fakeFetch(deepseekReply(broken));
-    const graph = await generateGraphWithLlm(CLUES, { ...base, fetch, log: (e) => events.push(e.type) });
+    const graph = await generateLaneWithLlm({ clues: CLUES, lane: "alternative" }, { ...base, fetch, log: (e) => events.push(e.type) });
 
     expect(calls).toHaveLength(1);
-    expect(graph.recommendations).toHaveLength(8);
-    expect(graph.recommendations.map((r) => r.nodeId)).not.toContain("libro-inexistente");
+    expect(graph.edges.map((e) => e.id)).not.toContain("loop");
     expect(events).toContain("salvaged");
   });
 
-  it("reintenta con los errores concretos cuando descartar dejaría un carril pobre", async () => {
-    const broken = modelOutput((g) => {
-      const recs = g.recommendations as { lane: string; nodeId: string; path: string[] }[];
-      for (const [i, rec] of recs.filter((r) => r.lane === "affinity").slice(0, 2).entries()) {
-        rec.nodeId = `libro-inexistente-${i}`;
-        rec.path = ["on-the-road", `libro-inexistente-${i}`];
-      }
+  it("reintenta con los errores concretos cuando la recomendación está rota", async () => {
+    const broken = laneOutput("rayuela", (g) => {
+      const [rec] = g.recommendations as { nodeId: string; path: string[] }[];
+      rec.nodeId = "libro-inexistente";
+      rec.path = ["on-the-road", "libro-inexistente"];
     });
-    const { fetch, calls } = fakeFetch(deepseekReply(broken), deepseekReply(modelOutput()));
-    const graph = await generateGraphWithLlm(CLUES, { ...base, fetch });
+    const { fetch, calls } = fakeFetch(deepseekReply(broken), deepseekReply(laneOutput("rayuela")));
+    const graph = await generateLaneWithLlm({ clues: CLUES, lane: "alternative" }, { ...base, fetch });
 
-    expect(graph.recommendations).toHaveLength(9);
+    expect(graph.recommendations[0].nodeId).toBe("rayuela");
     expect(calls).toHaveLength(2);
     const repair = (calls[1].body.messages as { role: string; content: string }[]).at(-1)!;
     expect(repair.role).toBe("user");
-    expect(repair.content).toContain("Nodo inexistente: libro-inexistente-0");
+    expect(repair.content).toContain("Nodo inexistente: libro-inexistente");
   });
 
   it("da vuelta una influencia escrita al revés en vez de rechazarla", async () => {
-    const inverted = modelOutput((g) => {
-      const edge = (g.edges as { id: string; source: string; target: string }[]).find((e) => e.id === "wolfe-road")!;
+    const inverted = laneOutput("los-detectives-salvajes", (g) => {
+      const edge = (g.edges as { id: string; source: string; target: string }[]).find((e) => e.id === "rimbaud-beat")!;
       [edge.source, edge.target] = [edge.target, edge.source];
     });
     const { fetch } = fakeFetch(deepseekReply(inverted));
-    const graph = await generateGraphWithLlm(CLUES, { ...base, fetch });
-    expect(graph.edges.find((e) => e.id === "wolfe-road")).toMatchObject({ source: "thomas-wolfe", target: "on-the-road" });
+    const graph = await generateLaneWithLlm({ clues: CLUES, lane: "beyond" }, { ...base, fetch });
+    expect(graph.edges.find((e) => e.id === "rimbaud-beat")).toMatchObject({ source: "arthur-rimbaud", target: "generacion-beat" });
+  });
+
+  it("recorta nodos sobrantes que no están en el recorrido en vez de reintentar", async () => {
+    const tooMany = laneOutput("rayuela", (g) => {
+      const nodes = g.nodes as Record<string, unknown>[];
+      for (let i = 0; i < 8; i++) nodes.push({ id: `extra-${i}`, kind: "person", label: `Extra ${i}`, subtitle: "x", era: { from: 1900, label: "1900" }, isClue: false });
+    });
+    const { fetch, calls } = fakeFetch(deepseekReply(tooMany));
+    const graph = await generateLaneWithLlm({ clues: CLUES, lane: "alternative" }, { ...base, fetch });
+    expect(calls).toHaveLength(1);
+    expect(graph.nodes.length).toBeLessThanOrEqual(GRAPH_LIMITS.maxNodesPerLane);
   });
 
   it("se recupera de JSON inválido y de un error 503", async () => {
     const { fetch, calls } = fakeFetch(
       new Response(JSON.stringify({ error: { message: "busy" } }), { status: 503 }),
       deepseekReply("{ esto no es json"),
-      deepseekReply(modelOutput()),
+      deepseekReply(laneOutput("rayuela")),
     );
-    const graph = await generateGraphWithLlm(CLUES, { ...base, fetch });
+    const graph = await generateLaneWithLlm({ clues: CLUES, lane: "alternative" }, { ...base, fetch });
     expect(graph.nodes.length).toBeGreaterThan(0);
     expect(calls).toHaveLength(3);
   });
 
-  it("falla con EngineError después del último intento", async () => {
-    const empty = modelOutput((g) => (g.recommendations = []));
-    const { fetch } = fakeFetch(deepseekReply(empty), deepseekReply(empty), deepseekReply(empty));
-    await expect(generateGraphWithLlm(CLUES, { ...base, fetch })).rejects.toBeInstanceOf(EngineError);
+  it("por defecto hace un solo reintento y falla con EngineError", async () => {
+    const empty = laneOutput("rayuela", (g) => (g.recommendations = []));
+    const { fetch, calls } = fakeFetch(deepseekReply(empty), deepseekReply(empty), deepseekReply(empty));
+    await expect(generateLaneWithLlm({ clues: CLUES, lane: "alternative" }, { apiKey: "k", fetch })).rejects.toBeInstanceOf(EngineError);
+    expect(calls).toHaveLength(2);
   });
 
   it("no reintenta errores que no se arreglan reintentando (401)", async () => {
     const { fetch, calls } = fakeFetch(new Response(JSON.stringify({ error: { message: "bad key" } }), { status: 401 }));
-    await expect(generateGraphWithLlm(CLUES, { ...base, fetch })).rejects.toThrow(/401/);
+    await expect(generateLaneWithLlm({ clues: CLUES, lane: "alternative" }, { ...base, fetch })).rejects.toThrow(/401/);
     expect(calls).toHaveLength(1);
   });
 });
@@ -274,7 +321,7 @@ describe("corrida real (On the Road · Generación Beat · La libertad)", () => 
 
     const { salvage } = await import("./llm-engine");
     expect(normalized.edges.find((e) => e.id === "e-kerouac-road")).toMatchObject({ type: "authored", source: "jack-kerouac" });
-    const rescued = salvage(normalized, 1);
+    const rescued = salvage(normalized, ConnectionGraphSchema);
     expect(rescued?.droppedEdges).toEqual([]);
     expect(rescued?.graph.recommendations).toHaveLength(5);
   });
@@ -294,17 +341,18 @@ describe("corrida real (Clarice Lispector · Desarraigo · tiempo detenido)", ()
     expect(out.edges.find((e) => e.id === "kerouac-road")).toMatchObject({ type: "authored", source: "jack-kerouac", target: "on-the-road" });
     expect(out.edges.find((e) => e.id === "road-libertad")?.type).toBe("shared_theme");
   });
+});
 
-  it("recorta nodos sobrantes que no están en ningún recorrido en vez de reintentar", async () => {
-    const tooMany = modelOutput((g) => {
-      const nodes = g.nodes as Record<string, unknown>[];
-      for (let i = 0; i < 4; i++) nodes.push({ id: `extra-${i}`, kind: "person", label: `Extra ${i}`, subtitle: "x", era: { from: 1900, label: "1900" }, isClue: false });
-    });
-    const { fetch, calls } = fakeFetch(deepseekReply(tooMany));
-    const graph = await generateGraphWithLlm(CLUES, { ...base, fetch });
-    expect(calls).toHaveLength(1);
-    expect(graph.nodes.length).toBeLessThanOrEqual(16);
-    expect(graph.recommendations).toHaveLength(9);
+describe("belongs_to mal dirigido", () => {
+  it("invierte movimiento → libro y convierte persona → persona en tema en común", () => {
+    const raw = JSON.parse(modelOutput((g) => {
+      const edges = g.edges as Record<string, unknown>[];
+      edges.push({ id: "beat-aullido", source: "generacion-beat", target: "aullido", type: "belongs_to", confidence: "documented", summary: "s", explanation: "e" });
+      edges.push({ id: "wolfe-rimbaud", source: "thomas-wolfe", target: "arthur-rimbaud", type: "belongs_to", confidence: "interpretive", summary: "s", explanation: "e" });
+    }));
+    const out = normalizeRawGraph(raw, CLUES) as { edges: { id: string; type: string; source: string; target: string }[] };
+    expect(out.edges.find((e) => e.id === "beat-aullido")).toMatchObject({ type: "belongs_to", source: "aullido", target: "generacion-beat" });
+    expect(out.edges.find((e) => e.id === "wolfe-rimbaud")?.type).toBe("shared_theme");
   });
 });
 

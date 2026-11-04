@@ -21,8 +21,8 @@ console.log(`Pistas: ${clues.map((c) => `${c.kind}:${c.label}`).join(" · ")}`);
 console.log(`Proveedor: ${config.provider} · modelos: ${config.models.join(", ")} · razonamiento: ${config.reasoning}${config.jsonSchema ? " · JSON Schema" : ""}\n`);
 
 const run = await runEngine(clues, config, (event) => {
-  if (event.type === "attempt") console.log(`→ intento ${event.attempt}…`);
-  if (event.type === "invalid") console.log(`  inválido:\n${event.reason.replace(/^/gm, "    ")}`);
+  if (event.type === "attempt") console.log(`→ ${event.lane} intento ${event.attempt}…`);
+  if (event.type === "invalid") console.log(`  ${event.lane} inválido:\n${event.reason.replace(/^/gm, "    ")}`);
   if (event.type === "salvaged") {
     const parts = [
       event.droppedRecommendations.length ? `recomendaciones descartadas: ${event.droppedRecommendations.join(", ")}` : "",
@@ -30,10 +30,11 @@ const run = await runEngine(clues, config, (event) => {
     ].filter(Boolean);
     console.log(`  rescatado sin reintentar · ${parts.join(" · ")}`);
   }
-  if (event.type === "success") console.log(`  ok · respondió ${event.model}`);
+  if (event.type === "success") console.log(`  ${event.lane} ok · respondió ${event.model}`);
 });
 
-if (!run.ok || !run.graph || !run.generated || !run.quality) {
+if (run.error) console.error(`\nCarriles con error: ${run.error}`);
+if (!run.graph || !run.generated || !run.quality) {
   console.error(`\nFalló: ${run.error}`);
   process.exit(1);
 }
@@ -42,7 +43,7 @@ const { graph, generated, quality, usage } = run;
 const nodes = new Map(graph.nodes.map((n) => [n.id, n]));
 const cost = usage.costUsd !== undefined ? ` · costo US$ ${usage.costUsd.toFixed(4)}` : "";
 console.log(`\ntokens entrada ${usage.input} (cache ${usage.cached}) · salida ${usage.output}${cost}`);
-console.log(`${graph.nodes.length} nodos · ${graph.edges.length} aristas · modelo ${(run.llmMs / 1000).toFixed(1)} s · total ${(run.totalMs / 1000).toFixed(1)} s\n`);
+console.log(`${graph.nodes.length} nodos · ${graph.edges.length} aristas · primer carril ${(run.firstLaneMs / 1000).toFixed(1)} s · total ${(run.totalMs / 1000).toFixed(1)} s\n`);
 
 for (const lane of LANE_ORDER) {
   console.log(LANE_META[lane].label.toUpperCase());

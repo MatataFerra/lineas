@@ -14,8 +14,12 @@ export const GRAPH_LIMITS = {
   maxNodes: 16,
   /** Saltos máximos desde una pista hasta una recomendación. */
   maxHops: 2,
-  /** Recomendaciones por carril. */
+  /** Recomendaciones por carril en un grafo completo (el de ejemplo). */
   maxPerLane: 3,
+  /** Nodos máximos que puede traer la respuesta de un solo carril. */
+  maxNodesPerLane: 8,
+  /** Nodos máximos del mapa armado uniendo carriles (lo visible: un libro por carril). */
+  maxMergedNodes: 24,
 } as const;
 
 /* ------------------------------------------------------------------ */
@@ -185,15 +189,26 @@ export type Recommendation = z.infer<typeof RecommendationSchema>;
 /* Grafo completo                                                      */
 /* ------------------------------------------------------------------ */
 
-export const ConnectionGraphSchema = z
-  .object({
-    version: z.literal(1),
-    clues: z.array(ClueSchema).min(1),
-    nodes: z.array(GraphNodeSchema).min(2).max(GRAPH_LIMITS.maxNodes),
-    edges: z.array(GraphEdgeSchema).min(1),
-    recommendations: z.array(RecommendationSchema).min(1),
-  })
-  .superRefine((graph, ctx) => {
+const GraphObjectSchema = z.object({
+  version: z.literal(1),
+  clues: z.array(ClueSchema).min(1),
+  nodes: z.array(GraphNodeSchema).min(2),
+  edges: z.array(GraphEdgeSchema).min(1),
+  recommendations: z.array(RecommendationSchema).min(1),
+});
+
+interface GraphRules {
+  /** Carriles que tienen que tener al menos una recomendación. */
+  requiredLanes: readonly Lane[];
+  maxNodes: number;
+  maxPerLane: number;
+}
+
+function graphSchema(rules: GraphRules) {
+  return GraphObjectSchema.superRefine((graph, ctx) => {
+    if (graph.nodes.length > rules.maxNodes) {
+      ctx.addIssue({ code: "custom", path: ["nodes"], message: `Demasiados nodos: ${graph.nodes.length} (máximo ${rules.maxNodes})` });
+    }
     const nodes = new Map(graph.nodes.map((n) => [n.id, n]));
 
     if (nodes.size !== graph.nodes.length) {
@@ -284,17 +299,38 @@ export const ConnectionGraphSchema = z
     });
 
     for (const [lane, count] of perLane) {
-      if (count > GRAPH_LIMITS.maxPerLane) {
+      if (count > rules.maxPerLane) {
         ctx.addIssue({ code: "custom", path: ["recommendations"], message: `Demasiadas recomendaciones en ${lane}` });
       }
+      if (!rules.requiredLanes.includes(lane) && rules.requiredLanes.length === 1) {
+        ctx.addIssue({ code: "custom", path: ["recommendations"], message: `Este pedido es solo para el carril ${rules.requiredLanes[0]}, no ${lane}` });
+      }
     }
-    for (const lane of LaneSchema.options) {
+    for (const lane of rules.requiredLanes) {
       if (!perLane.has(lane)) {
         ctx.addIssue({ code: "custom", path: ["recommendations"], message: `Falta al menos una recomendación en ${lane}` });
       }
     }
   });
+}
+
+/** Grafo completo: los tres carriles (el de ejemplo, y el contrato histórico). */
+export const ConnectionGraphSchema = graphSchema({ requiredLanes: LaneSchema.options, maxNodes: GRAPH_LIMITS.maxNodes, maxPerLane: GRAPH_LIMITS.maxPerLane });
 export type ConnectionGraph = z.infer<typeof ConnectionGraphSchema>;
+
+/**
+ * Lo que devuelve el motor para un carril: un subgrafo con una sola
+ * recomendación de ese carril y su recorrido desde las pistas.
+ */
+const laneSchemas = new Map(
+  LaneSchema.options.map((lane) => [lane, graphSchema({ requiredLanes: [lane], maxNodes: GRAPH_LIMITS.maxNodesPerLane, maxPerLane: 1 })]),
+);
+export function laneGraphSchema(lane: Lane) {
+  return laneSchemas.get(lane)!;
+}
+
+/** El mapa que se arma en el cliente uniendo los carriles que ya llegaron (puede faltar alguno). */
+export const MergedGraphSchema = graphSchema({ requiredLanes: [], maxNodes: GRAPH_LIMITS.maxMergedNodes, maxPerLane: 1 });
 /** Forma de entrada (antes de aplicar defaults), útil para escribir datos a mano. */
 export type ConnectionGraphInput = z.input<typeof ConnectionGraphSchema>;
 

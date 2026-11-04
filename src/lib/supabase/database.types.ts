@@ -14,6 +14,152 @@ export type Database = {
   }
   public: {
     Tables: {
+      edge_votes: {
+        Row: {
+          created_at: string
+          edge_id: number
+          updated_at: string
+          user_id: string
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          edge_id: number
+          updated_at?: string
+          user_id?: string
+          value: number
+        }
+        Update: {
+          created_at?: string
+          edge_id?: number
+          updated_at?: string
+          user_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "edge_votes_edge_id_fkey"
+            columns: ["edge_id"]
+            isOneToOne: false
+            referencedRelation: "kg_edges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      graph_cache: {
+        Row: {
+          graphs: Json
+          key: string
+          lane: string
+          updated_at: string
+        }
+        Insert: {
+          graphs: Json
+          key: string
+          lane: string
+          updated_at?: string
+        }
+        Update: {
+          graphs?: Json
+          key?: string
+          lane?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      kg_edges: {
+        Row: {
+          confidence: string
+          created_at: string
+          down: number
+          explanation: string
+          id: number
+          quote: string | null
+          score: number | null
+          source: string
+          summary: string
+          target: string
+          type: string
+          up: number
+          updated_at: string
+        }
+        Insert: {
+          confidence: string
+          created_at?: string
+          down?: number
+          explanation: string
+          id?: never
+          quote?: string | null
+          score?: number | null
+          source: string
+          summary: string
+          target: string
+          type: string
+          up?: number
+          updated_at?: string
+        }
+        Update: {
+          confidence?: string
+          created_at?: string
+          down?: number
+          explanation?: string
+          id?: never
+          quote?: string | null
+          score?: number | null
+          source?: string
+          summary?: string
+          target?: string
+          type?: string
+          up?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kg_edges_source_fkey"
+            columns: ["source"]
+            isOneToOne: false
+            referencedRelation: "kg_nodes"
+            referencedColumns: ["slug"]
+          },
+          {
+            foreignKeyName: "kg_edges_target_fkey"
+            columns: ["target"]
+            isOneToOne: false
+            referencedRelation: "kg_nodes"
+            referencedColumns: ["slug"]
+          },
+        ]
+      }
+      kg_nodes: {
+        Row: {
+          created_at: string
+          era: Json
+          kind: string
+          label: string
+          original_title: string | null
+          slug: string
+          subtitle: string | null
+        }
+        Insert: {
+          created_at?: string
+          era: Json
+          kind: string
+          label: string
+          original_title?: string | null
+          slug: string
+          subtitle?: string | null
+        }
+        Update: {
+          created_at?: string
+          era?: Json
+          kind?: string
+          label?: string
+          original_title?: string | null
+          slug?: string
+          subtitle?: string | null
+        }
+        Relationships: []
+      }
       library_items: {
         Row: {
           author: string | null
@@ -44,6 +190,36 @@ export type Database = {
           title?: string
           user_id?: string
           year_label?: string | null
+        }
+        Relationships: []
+      }
+      rec_signals: {
+        Row: {
+          book_slug: string
+          clues_key: string
+          created_at: string
+          id: number
+          lane: string
+          signal: Database["public"]["Enums"]["rec_signal"]
+          user_id: string
+        }
+        Insert: {
+          book_slug: string
+          clues_key: string
+          created_at?: string
+          id?: never
+          lane: string
+          signal: Database["public"]["Enums"]["rec_signal"]
+          user_id?: string
+        }
+        Update: {
+          book_slug?: string
+          clues_key?: string
+          created_at?: string
+          id?: never
+          lane?: string
+          signal?: Database["public"]["Enums"]["rec_signal"]
+          user_id?: string
         }
         Relationships: []
       }
@@ -79,10 +255,32 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      kg_upsert_edge: { Args: { p_edge: Json }; Returns: number }
+      kg_upsert_node: { Args: { p_node: Json }; Returns: undefined }
+      record_rec_signal: {
+        Args: {
+          p_book_slug: string
+          p_clues_key: string
+          p_edges: Json
+          p_lane: string
+          p_nodes: Json
+          p_signal: Database["public"]["Enums"]["rec_signal"]
+        }
+        Returns: undefined
+      }
+      vote_edge: {
+        Args: { p_edge: Json; p_source: Json; p_target: Json; p_value: number }
+        Returns: {
+          down: number
+          edge_id: number
+          my_vote: number
+          up: number
+        }[]
+      }
     }
     Enums: {
       library_status: "saved" | "read"
+      rec_signal: "up" | "down" | "saved" | "read" | "skipped"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -211,6 +409,7 @@ export const Constants = {
   public: {
     Enums: {
       library_status: ["saved", "read"],
+      rec_signal: ["up", "down", "saved", "read", "skipped"],
     },
   },
 } as const
