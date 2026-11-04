@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BookCover } from "@/components/book-cover";
 import { ArrowLeftIcon, ArrowRightIcon, CloseIcon } from "@/components/icons";
@@ -93,6 +94,10 @@ export function ConnectionDialog({ graph, nodeId, onClose, onShowConnections }: 
               </ul>
             )}
             {detail.text && <p className="mt-5 max-w-[46ch] text-[14px] leading-relaxed text-ink/85">{detail.text}</p>}
+            <Link href={`/libro/${node.id}`} className="mt-3 inline-flex items-center gap-1.5 text-[13px] underline underline-offset-[3px] hover:text-accent">
+              Ver la ficha del libro
+              <ArrowRightIcon size={12} />
+            </Link>
           </div>
         </div>
 

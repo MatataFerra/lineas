@@ -8,7 +8,7 @@ import { useLineas } from "@/lib/store";
 import { MenuIcon, UserIcon } from "./icons";
 
 const NAV = [
-  { href: "/", label: "Descubrir", match: ["/", "/resultados", "/conexiones"] },
+  { href: "/", label: "Descubrir", match: ["/", "/resultados", "/conexiones", "/libro"] },
   { href: "#", label: "Explorar", match: [] as string[] },
   { href: "/biblioteca", label: "Mi biblioteca", match: ["/biblioteca"] },
 ];
@@ -35,7 +35,7 @@ export function SiteHeader() {
 
       <nav aria-label="Principal" className="hidden gap-9 text-[13px] md:flex">
         {NAV.map((item) => {
-          const current = item.match.includes(pathname);
+          const current = item.match.some((m) => pathname === m || (m !== "/" && pathname.startsWith(`${m}/`)));
           return (
             <Link
               key={item.label}

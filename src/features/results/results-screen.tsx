@@ -246,11 +246,15 @@ function LaneCard({ lane, state }: { lane: Lane; state: LaneState }) {
         <div className="md:hidden">
           <BookCover id={node.id} title={node.label} author={author} size="md" coverUrl={node.book?.coverUrl} />
         </div>
-        <div className="mx-auto mt-5.5 mb-5 hidden md:block">
+        <Link href={`/libro/${node.id}`} tabIndex={-1} aria-hidden="true" className="mx-auto mt-5.5 mb-5 hidden transition-transform hover:-translate-y-0.5 md:block">
           <BookCover id={node.id} title={node.label} author={author} size="lg" coverUrl={node.book?.coverUrl} />
-        </div>
+        </Link>
         <div className="min-w-0 pt-1 md:pt-0">
-          <h2 className="font-serif text-[22px] leading-[1.15] md:text-[23px]">{node.label}</h2>
+          <h2 className="font-serif text-[22px] leading-[1.15] md:text-[23px]">
+            <Link href={`/libro/${node.id}`} className="hover:underline">
+              {node.label}
+            </Link>
+          </h2>
           <p className="mt-1 text-[13px] text-muted">
             {author} · {node.era.label}
           </p>
