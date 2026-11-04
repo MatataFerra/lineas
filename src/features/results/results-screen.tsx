@@ -51,7 +51,7 @@ export function ResultsScreen() {
 
         <Link
           href="/"
-          className="mt-5 inline-flex items-center gap-2 py-2 text-[13px] text-muted hover:text-ink md:mt-7">
+          className="mt-5 inline-flex items-center gap-2 py-2 mb-4 text-[13px] text-muted hover:text-ink md:mb-8 md:mt-7">
           <ArrowLeftIcon size={14} />
           Volver
         </Link>

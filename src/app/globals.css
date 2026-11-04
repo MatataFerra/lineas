@@ -159,3 +159,76 @@ dialog::backdrop {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Transiciones entre pantallas (components/page-transition.tsx)
+   Lo que se va se desvanece rápido; lo nuevo llega con un leve ascenso. El
+   encabezado se desliza a su nuevo lugar en vez de desvanecerse, y la
+   ilustración de la home entra y sale por la izquierda.
+   ------------------------------------------------------------------------ */
+::view-transition {
+  pointer-events: none;
+}
+::view-transition-old(.page) {
+  animation: 140ms ease-in both lineas-vt-fade reverse;
+}
+::view-transition-new(.page) {
+  animation:
+    240ms ease-out 110ms both lineas-vt-fade,
+    420ms cubic-bezier(0.2, 0.7, 0.2, 1) both lineas-vt-rise;
+}
+::view-transition-group(site-header) {
+  animation-duration: 420ms;
+  animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+  z-index: 100;
+}
+::view-transition-old(site-header) {
+  display: none;
+}
+::view-transition-new(site-header) {
+  animation: none;
+}
+::view-transition-old(home-art) {
+  animation: 260ms ease-in both lineas-vt-art-out;
+}
+::view-transition-new(home-art) {
+  animation: 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both lineas-vt-art-in;
+}
+@keyframes lineas-vt-fade {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+@keyframes lineas-vt-rise {
+  from {
+    translate: 0 12px;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+@keyframes lineas-vt-art-out {
+  to {
+    translate: -100% 0;
+    opacity: 0.4;
+  }
+}
+@keyframes lineas-vt-art-in {
+  from {
+    translate: -100% 0;
+    opacity: 0.4;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}

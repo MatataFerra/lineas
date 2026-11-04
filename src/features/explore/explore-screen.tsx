@@ -12,6 +12,9 @@ import { CONFIDENCE_META, EDGE_META, NODE_KIND_LABEL } from "@/lib/graph/labels"
 import { otherEnd } from "@/lib/graph/queries";
 import type { GraphNode } from "@/lib/graph/schema";
 
+/** Entre rincones: sin transición y sin volver arriba; cambia el mapa y el resto queda donde estaba. */
+const INSTANT = ["instant"];
+
 type Bridges = Record<string, { slug: string; title: string }[]>;
 
 interface ExploreScreenProps {
@@ -53,7 +56,7 @@ export function ExploreScreen({ rincon, list, bridges }: ExploreScreenProps) {
           <RinconNav list={list} current={rincon.slug} />
 
           <main className="min-w-0">
-            <Link href="/explorar" className="inline-flex items-center gap-2 py-2 text-[13px] text-muted hover:text-ink lg:hidden">
+            <Link href="/explorar" className="inline-flex items-center gap-2 py-2 mb-4 text-[13px] text-muted hover:text-ink md:mb-8 lg:hidden">
               <ArrowLeftIcon size={14} />
               Todos los rincones
             </Link>
@@ -84,7 +87,7 @@ export function ExploreScreen({ rincon, list, bridges }: ExploreScreenProps) {
                   <ul className="mt-3 flex flex-col">
                     {onward.slice(0, 6).map((r) => (
                       <li key={r.slug} className="border-t border-line first:border-t-0">
-                        <Link href={`/explorar/${r.slug}`} className="group flex items-center justify-between gap-3 py-3">
+                        <Link href={`/explorar/${r.slug}`} scroll={false} transitionTypes={INSTANT} className="group flex items-center justify-between gap-3 py-3">
                           <span className="min-w-0">
                             <span className="block font-serif text-[16px] group-hover:underline group-hover:underline-offset-4">{r.title}</span>
                             <span className="block truncate text-[12px] text-muted">por {r.via.join(", ")}</span>
@@ -119,7 +122,7 @@ function RinconNav({ list, current }: { list: ExploreScreenProps["list"]; curren
               .map((r) => (
                 <li key={r.slug}>
                   <Link
-                    href={`/explorar/${r.slug}`}
+                    href={`/explorar/${r.slug}`} scroll={false} transitionTypes={INSTANT}
                     aria-current={r.slug === current ? "page" : undefined}
                     className="-ml-2.5 block rounded-md px-2.5 py-1 text-[13.5px] hover:bg-chip aria-[current=page]:bg-ink aria-[current=page]:text-bg">
                     {r.title}
@@ -195,7 +198,7 @@ function NodeDetail({ rincon, node, bridges, onSelect }: { rincon: Rincon; node:
           {bridges.map((b, i) => (
             <span key={b.slug}>
               {i > 0 && (i === bridges.length - 1 ? " y " : ", ")}
-              <Link href={`/explorar/${b.slug}`} className="text-ink underline underline-offset-[3px] hover:text-accent">
+              <Link href={`/explorar/${b.slug}`} scroll={false} transitionTypes={INSTANT} className="text-ink underline underline-offset-[3px] hover:text-accent">
                 {b.title}
               </Link>
             </span>

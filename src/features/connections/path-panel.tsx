@@ -69,8 +69,8 @@ export function PathPanel({ model, view, selection, onSelect, onOpenBook, laneDo
               onClick={() => onSelect({ kind: "edge", id: edge.id })}
               className="rounded-xl border border-line px-3.5 py-3 text-left hover:bg-chip/60"
             >
-              <span className="flex justify-between gap-2 text-[13px] font-medium">
-                {index.nodes.get(otherEnd(edge, node.id))?.label}
+              <span className="flex items-start justify-between gap-3">
+                <span className="min-w-0 pt-0.5 text-[13px] leading-snug font-medium">{index.nodes.get(otherEnd(edge, node.id))?.label}</span>
                 <EdgeTypeBadge type={edge.type} />
               </span>
               <span className="mt-1 block text-xs leading-normal text-muted">{edge.summary}</span>

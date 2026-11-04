@@ -9,6 +9,7 @@ import { MAX_CLUES, type ClueKind } from "@/lib/graph/schema";
 import { useLineas } from "@/lib/store";
 import { STARTER_IDEAS } from "./catalog";
 import { ClueDialog } from "./clue-dialog";
+import { InspirationArt } from "./inspiration-art";
 
 export function HomeScreen() {
   const router = useRouter();
@@ -29,7 +30,7 @@ export function HomeScreen() {
 
   return (
     <div className="flex min-h-dvh">
-      <Landscape />
+      <InspirationArt />
 
       <div className="flex min-w-0 flex-1 flex-col px-[22px] pt-5 pb-7 md:px-16 md:pt-7 md:pb-8">
         <SiteHeader />
@@ -153,17 +154,3 @@ export function HomeScreen() {
 }
 
 /** Franja de paisaje del diseño original: una ruta que se pierde en el horizonte. */
-function Landscape() {
-  return (
-    <div className="relative hidden max-w-[260px] flex-[0_0_18%] overflow-hidden md:block" aria-hidden="true">
-      <svg viewBox="0 0 200 820" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 size-full">
-        <rect width="200" height="820" className="fill-[#e4dccf] dark:fill-[#1c1a18]" />
-        <polygon points="0,330 40,270 80,300 120,240 160,290 200,250 200,820 0,820" className="fill-[#cec3b2] dark:fill-[#29261f]" />
-        <polygon points="0,420 50,360 95,400 140,340 200,390 200,820 0,820" className="fill-[#a69986] dark:fill-[#332f28]" />
-        <rect y="470" width="200" height="350" className="fill-[#8b7f6e] dark:fill-[#201e1a]" />
-        <polygon points="97,470 103,470 190,820 10,820" className="fill-[#4a443c] dark:fill-[#0c0b0a]" />
-        <line x1="100" y1="476" x2="100" y2="820" strokeWidth="2.5" strokeDasharray="12 16" className="stroke-[#f4f0e8] dark:stroke-[#d9b36a]" />
-      </svg>
-    </div>
-  );
-}

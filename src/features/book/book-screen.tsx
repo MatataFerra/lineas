@@ -80,7 +80,7 @@ export function BookScreen({ params }: { params: Promise<{ id: string }> }) {
 
   return (
     <Shell>
-      <button type="button" onClick={() => router.back()} className="mt-5 inline-flex items-center gap-2 py-2 text-[13px] text-muted hover:text-ink md:mt-6">
+      <button type="button" onClick={() => router.back()} className="mt-5 inline-flex items-center gap-2 py-2 mb-4 text-[13px] text-muted hover:text-ink md:mb-8 md:mt-6">
         <ArrowLeftIcon size={14} />
         Volver
       </button>

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ExploreScreen } from "@/features/explore/explore-screen";
 import { RINCONES, rinconBridges, rinconBySlug, rinconSummaries } from "@/lib/explore/rincones";
+import { PageTransition } from "@/components/page-transition";
 
 export function generateStaticParams() {
   return RINCONES.map((r) => ({ slug: r.slug }));
@@ -25,5 +26,9 @@ async function RinconPage({ params }: { params: Promise<{ slug: string }> }) {
   const rincon = rinconBySlug((await params).slug);
   if (!rincon) notFound();
   const list = rinconSummaries().map(({ slug, title, group }) => ({ slug, title, group }));
-  return <ExploreScreen key={rincon.slug} rincon={rincon} list={list} bridges={rinconBridges(rincon)} />;
+  return (
+    <PageTransition>
+      <ExploreScreen key={rincon.slug} rincon={rincon} list={list} bridges={rinconBridges(rincon)} />
+    </PageTransition>
+  );
 }

@@ -59,7 +59,7 @@ export function ConnectionsScreen() {
       <div className="mx-auto max-w-[1240px]">
         <SiteHeader />
 
-        <Link href="/resultados" className="mt-5 inline-flex items-center gap-2 py-2 text-[13px] text-muted hover:text-ink lg:mt-6">
+        <Link href="/resultados" className="mt-5 inline-flex items-center gap-2 py-2 mb-4 text-[13px] text-muted hover:text-ink md:mb-8 lg:mt-6">
           <ArrowLeftIcon size={14} />
           Volver a los resultados
         </Link>

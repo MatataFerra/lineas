@@ -36,7 +36,7 @@ export function AuthorScreen({ params }: { params: Promise<{ slug: string }> }) 
     <div className="min-h-dvh px-[22px] pt-5 pb-16 md:px-14 md:pt-7">
       <div className="mx-auto max-w-[1160px]">
         <SiteHeader />
-        <button type="button" onClick={() => router.back()} className="mt-5 inline-flex items-center gap-2 py-2 text-[13px] text-muted hover:text-ink md:mt-6">
+        <button type="button" onClick={() => router.back()} className="mt-5 inline-flex items-center gap-2 py-2 mb-4 text-[13px] text-muted hover:text-ink md:mb-8 md:mt-6">
           <ArrowLeftIcon size={14} />
           Volver
         </button>

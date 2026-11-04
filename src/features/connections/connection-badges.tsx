@@ -2,7 +2,7 @@ import { CONFIDENCE_META, EDGE_META } from "@/lib/graph/labels";
 import type { Confidence, EdgeType } from "@/lib/graph/schema";
 
 export function EdgeTypeBadge({ type }: { type: EdgeType }) {
-  return <span className="inline-block rounded-full border border-line px-2 py-0.5 text-[11px] text-muted">{EDGE_META[type].label}</span>;
+  return <span className="inline-flex h-[22px] shrink-0 items-center rounded-md bg-chip px-2 text-[11px] whitespace-nowrap text-muted">{EDGE_META[type].label}</span>;
 }
 
 const CONFIDENCE_DOT: Record<Confidence, string> = {

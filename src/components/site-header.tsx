@@ -28,7 +28,7 @@ export function SiteHeader() {
   };
 
   return (
-    <header className="relative flex items-center justify-between gap-6">
+    <header className="relative flex items-center justify-between gap-6" style={{ viewTransitionName: "site-header" }}>
       <Link href="/" className="font-serif text-[26px] tracking-[-0.01em] md:text-[28px]">
         Líneas
       </Link>
