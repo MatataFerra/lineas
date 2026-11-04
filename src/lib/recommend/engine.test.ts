@@ -8,6 +8,8 @@ const generateLaneWithLlm = vi.fn();
 const verifyGraphBooks = vi.fn();
 vi.mock("./llm-engine", () => ({ generateLaneWithLlm: (...args: unknown[]) => generateLaneWithLlm(...args) }));
 vi.mock("@/lib/catalog/books", () => ({ verifyGraphBooks: (...args: unknown[]) => verifyGraphBooks(...args) }));
+const fetchKnowledge = vi.fn(async () => undefined as string | undefined);
+vi.mock("./knowledge", () => ({ fetchKnowledge: () => fetchKnowledge() }));
 
 const { collides, recommendLanes } = await import("./engine");
 
@@ -115,6 +117,15 @@ describe("recommendLanes (modelo)", () => {
     const second = await collect(input);
     expect(generateLaneWithLlm).toHaveBeenCalledTimes(1);
     expect(second[0]).toMatchObject({ type: "lane", cached: true });
+  });
+
+  it("pasa al modelo lo que validaron los lectores", async () => {
+    withEnv({ LINEAS_ENGINE: "", LLM_PROVIDER: "deepseek", DEEPSEEK_API_KEY: "k" });
+    fetchKnowledge.mockResolvedValueOnce("Conexiones confirmadas por lectores: …");
+    generateLaneWithLlm.mockImplementation(async () => laneOf("aullido"));
+    verifyGraphBooks.mockImplementation(async (g: ConnectionGraph) => g);
+    await collect({ clues: [{ id: "x", kind: "idea", label: "conocimiento" }], lane: "affinity", exclude: [] });
+    expect(generateLaneWithLlm.mock.calls[0][0]).toMatchObject({ knowledge: "Conexiones confirmadas por lectores: …" });
   });
 });
 

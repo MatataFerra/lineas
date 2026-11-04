@@ -7,6 +7,7 @@ import { MOCK_GRAPH } from "@/lib/graph/mock";
 import { LaneSchema, type Clue, type ConnectionGraph, type Lane } from "@/lib/graph/schema";
 import { engineFromEnv, llmConfigFromEnv, type EngineName } from "./config";
 import type { ExcludedBook, StreamEvent } from "./events";
+import { fetchKnowledge } from "./knowledge";
 import { readLaneCache, writeLaneCache } from "./lane-cache";
 import { generateLaneWithLlm } from "./llm-engine";
 import { SYSTEM_PROMPT } from "./prompt";
@@ -55,10 +56,12 @@ export async function recommendLanes(input: RecommendInput, emit: (event: Stream
   const shown: ExcludedBook[] = [...input.exclude];
 
   const runLane = engine === "mock" ? mockLane : llmLane;
+  // Lo que validaron los lectores cerca de estas pistas: se busca una vez, mientras se lee el cache.
+  const knowledge = engine === "mock" ? Promise.resolve(undefined) : fetchKnowledge(input.clues);
   await Promise.all(
     lanes.map(async (lane, i) => {
       try {
-        await runLane({ ...input, lane, delayMs: input.lane ? 500 : 600 * (i + 1) }, shown, emit);
+        await runLane({ ...input, lane, delayMs: input.lane ? 500 : 600 * (i + 1), knowledge }, shown, emit);
       } catch (error) {
         console.error(`[recommend] carril ${lane}`, error);
         emit({ type: "lane-error", lane, message: "No pudimos armar este camino." });
@@ -68,9 +71,9 @@ export async function recommendLanes(input: RecommendInput, emit: (event: Stream
   emit({ type: "done" });
 }
 
-type LaneRun = (input: { clues: Clue[]; lane: Lane; delayMs: number }, shown: ExcludedBook[], emit: (event: StreamEvent) => void) => Promise<void>;
+type LaneRun = (input: { clues: Clue[]; lane: Lane; delayMs: number; knowledge: Promise<string | undefined> }, shown: ExcludedBook[], emit: (event: StreamEvent) => void) => Promise<void>;
 
-const llmLane: LaneRun = async ({ clues, lane }, shown, emit) => {
+const llmLane: LaneRun = async ({ clues, lane, knowledge }, shown, emit) => {
   const key = cacheKey(clues, lane);
 
   // Primero, una alternativa ya generada que no choque con lo mostrado.
@@ -87,11 +90,12 @@ const llmLane: LaneRun = async ({ clues, lane }, shown, emit) => {
     if (event.type === "success") console.info(`[recommend] ${lane} ok con ${event.model} en intento ${event.attempt}`, JSON.stringify(event.usage));
   };
 
-  let graph = await generateLaneWithLlm({ clues, lane, exclude: [...shown] }, { ...config, log });
+  const known = await knowledge;
+  let graph = await generateLaneWithLlm({ clues, lane, exclude: [...shown], knowledge: known }, { ...config, log });
   // Otro carril llegó antes con el mismo autor (o libro): se regenera una vez, excluyéndolo.
   if (collides(graph, shown)) {
     console.info(`[recommend] ${lane} repite autor; regenerando`);
-    graph = await generateLaneWithLlm({ clues, lane, exclude: [...shown] }, { ...config, log });
+    graph = await generateLaneWithLlm({ clues, lane, exclude: [...shown], knowledge: known }, { ...config, log });
   }
   shown.push(bookOf(graph));
 
