@@ -7,6 +7,7 @@ import { MOCK_GRAPH } from "@/lib/graph/mock";
 import { LaneSchema, type Clue, type ConnectionGraph, type Lane } from "@/lib/graph/schema";
 import { engineFromEnv, llmConfigFromEnv, type EngineName } from "./config";
 import type { ExcludedBook, StreamEvent } from "./events";
+import { readLaneCache, writeLaneCache } from "./lane-cache";
 import { generateLaneWithLlm } from "./llm-engine";
 import { SYSTEM_PROMPT } from "./prompt";
 
@@ -31,11 +32,6 @@ export function currentEngine(): EngineName {
 
 /** Cuánto esperamos al catálogo antes de mostrar el libro como «sin verificar» (y corregirlo después). */
 const VERIFY_BUDGET_MS = 1500;
-
-/* Cache en memoria por instancia: alternativas ya generadas para cada carril de cada búsqueda. */
-const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const CACHE_MAX = 600;
-const cache = new Map<string, { graphs: ConnectionGraph[]; at: number }>();
 
 /** Cambiar el prompt invalida el cache solo. */
 const PROMPT_VERSION = createHash("sha1").update(SYSTEM_PROMPT).digest("hex").slice(0, 8);
@@ -78,7 +74,7 @@ const llmLane: LaneRun = async ({ clues, lane }, shown, emit) => {
   const key = cacheKey(clues, lane);
 
   // Primero, una alternativa ya generada que no choque con lo mostrado.
-  const cachedHit = cachedGraphs(key).find((g) => !collides(g, shown));
+  const cachedHit = (await readLaneCache(key, lane)).find((g) => !collides(g, shown));
   if (cachedHit) {
     shown.push(bookOf(cachedHit));
     emit({ type: "lane", lane, graph: { ...cachedHit, clues }, cached: true });
@@ -102,7 +98,7 @@ const llmLane: LaneRun = async ({ clues, lane }, shown, emit) => {
   const verification = verifyGraphBooks(graph, { googleBooksKey: process.env.GOOGLE_BOOKS_API_KEY, onlyRecommended: true });
   const inTime = await Promise.race([verification, sleep(VERIFY_BUDGET_MS).then(() => null)]);
   if (inTime) {
-    remember(key, inTime);
+    writeLaneCache(key, lane, inTime, sameBook);
     emit({ type: "lane", lane, graph: inTime, cached: false });
     return;
   }
@@ -110,7 +106,7 @@ const llmLane: LaneRun = async ({ clues, lane }, shown, emit) => {
   emit({ type: "lane", lane, graph, cached: false });
   const verified = await verification.catch(() => null);
   if (!verified) return;
-  remember(key, verified);
+  writeLaneCache(key, lane, verified, sameBook);
   const book = recommendedBook(verified);
   if (book?.book) emit({ type: "patch", lane, nodeId: book.id, book: book.book });
 };
@@ -142,20 +138,8 @@ export function collides(graph: ConnectionGraph, shown: ExcludedBook[]): boolean
   return shown.some((s) => s.title.trim().toLowerCase() === title || (author !== "" && authorKey(s.author) === author));
 }
 
-function cachedGraphs(key: string): ConnectionGraph[] {
-  const hit = cache.get(key);
-  if (!hit) return [];
-  if (Date.now() - hit.at > CACHE_TTL_MS) {
-    cache.delete(key);
-    return [];
-  }
-  return hit.graphs;
-}
-
-function remember(key: string, graph: ConnectionGraph) {
-  const graphs = cachedGraphs(key).filter((g) => bookOf(g).title !== bookOf(graph).title);
-  cache.set(key, { graphs: [...graphs, graph], at: Date.now() });
-  if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value!);
+function sameBook(a: ConnectionGraph, b: ConnectionGraph): boolean {
+  return bookOf(a).title === bookOf(b).title;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

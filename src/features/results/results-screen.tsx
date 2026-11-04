@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { BookCover } from "@/components/book-cover";
 import { ArrowLeftIcon, ArrowRightIcon, PenIcon } from "@/components/icons";
 import { SiteHeader } from "@/components/site-header";
+import { VoteControl } from "@/components/vote-control";
 import { LANE_META, LANE_ORDER } from "@/lib/graph/labels";
 import { recommendedBook } from "@/lib/graph/merge";
 import type { Clue, Lane } from "@/lib/graph/schema";
@@ -226,6 +227,8 @@ function LaneCard({ lane, state }: { lane: Lane; state: LaneState }) {
   const toggleLibrary = useLineas((s) => s.toggleLibrary);
   const setFocus = useLineas((s) => s.setFocus);
   const showAnother = useLineas((s) => s.showAnother);
+  const recVotes = useLineas((s) => s.recVotes);
+  const voteRecommendation = useLineas((s) => s.voteRecommendation);
 
   const graph = state.options[state.index];
   const rec = graph.recommendations[0];
@@ -265,6 +268,7 @@ function LaneCard({ lane, state }: { lane: Lane; state: LaneState }) {
         className="mt-2.5 self-start text-xs text-muted underline underline-offset-[3px] hover:text-ink">
         ¿Cómo llegamos acá?
       </Link>
+      <VoteControl question="¿Te sirve?" value={recVotes[node.id]} onVote={(v) => void voteRecommendation(lane, v)} className="mt-3" />
 
       <div className="min-h-5 flex-1" />
       <div className="mt-4 flex gap-2">

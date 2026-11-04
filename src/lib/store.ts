@@ -2,7 +2,8 @@
 
 import { create } from "zustand";
 import { authorOf, mergeLaneGraphs, recommendedBook } from "@/lib/graph/merge";
-import { LaneSchema, type Clue, type ClueKind, type ConnectionGraph, type GraphNode, type Lane } from "@/lib/graph/schema";
+import { indexGraph, pathEdges } from "@/lib/graph/queries";
+import { LaneSchema, type Clue, type ClueKind, type ConnectionGraph, type GraphEdge, type GraphNode, type Lane } from "@/lib/graph/schema";
 import { readEventStream, type ExcludedBook, type StreamEvent } from "@/lib/recommend/events";
 import { getBrowserSupabase } from "@/lib/supabase/client";
 import type { Enums, Json } from "@/lib/supabase/database.types";
@@ -73,6 +74,12 @@ interface LineasState {
   library: Record<string, LibraryEntry>;
   libraryError: string | null;
 
+  /** Mis votos de conexiones, por edgeKey. */
+  edgeVotes: Record<string, Vote>;
+  /** Mis votos de recomendaciones en esta búsqueda, por id de libro. */
+  recVotes: Record<string, Vote>;
+  voteError: string | null;
+
   hasClue: (label: string) => boolean;
   addClue: (label: string, kind: ClueKind) => void;
   toggleClue: (label: string, kind: ClueKind) => void;
@@ -86,6 +93,17 @@ interface LineasState {
   isIn: (bookId: string, status: LibraryStatus) => boolean;
   toggleLibrary: (book: BookSnapshot, status: LibraryStatus) => Promise<void>;
   setUser: (user: SessionUser | null) => Promise<void>;
+  /** 1 = me convence, -1 = no; votar lo mismo otra vez quita el voto. */
+  voteEdge: (edge: GraphEdge, value: Vote) => Promise<void>;
+  voteRecommendation: (lane: Lane, value: Vote) => Promise<void>;
+}
+
+export type Vote = 1 | -1;
+
+/** Una conexión es la misma si une los mismos nodos con el mismo tipo (el tema en común no tiene dirección). */
+export function edgeKey(edge: Pick<GraphEdge, "source" | "target" | "type">): string {
+  const [a, b] = edge.type === "shared_theme" && edge.target < edge.source ? [edge.target, edge.source] : [edge.source, edge.target];
+  return `${edge.type}|${a}|${b}`;
 }
 
 const INITIAL_CLUES: Clue[] = [
@@ -123,6 +141,9 @@ export const useLineas = create<LineasState>()((set, get) => ({
   authReady: false,
   library: {},
   libraryError: null,
+  edgeVotes: {},
+  recVotes: {},
+  voteError: null,
 
   hasClue: (label) => get().clues.some((c) => same(c.label, label)),
 
@@ -153,7 +174,7 @@ export const useLineas = create<LineasState>()((set, get) => ({
     searchAbort?.abort();
     const abort = new AbortController();
     searchAbort = abort;
-    set({ status: "loading", error: null, graphKey: key, lanes: emptyLanes(), graph: null, focus: null });
+    set({ status: "loading", error: null, graphKey: key, lanes: emptyLanes(), graph: null, focus: null, recVotes: {} });
 
     const applyEvent = (event: StreamEvent) => {
       if (event.type === "done") return;
@@ -190,6 +211,7 @@ export const useLineas = create<LineasState>()((set, get) => ({
   showAnother: async (lane) => {
     const state = get().lanes[lane];
     if (state.loadingMore || state.status !== "ready") return;
+    void recordSignal(get, lane, state.options[state.index], "skipped");
     if (state.index + 1 < state.options.length) {
       setLane(set, get, lane, { index: state.index + 1, error: null });
       return;
@@ -215,6 +237,11 @@ export const useLineas = create<LineasState>()((set, get) => ({
     const supabase = getBrowserSupabase();
     if (!user || !supabase) return;
 
+    if (on) {
+      const lane = LaneSchema.options.find((l) => recommendedBook(currentOption(get().lanes[l]))?.id === book.id);
+      if (lane) void recordSignal(get, lane, currentOption(get().lanes[lane]), status);
+    }
+
     const { error } = on
       ? await supabase.from("library_items").insert({ book_id: book.id, status, title: book.title, author: book.author, year_label: book.yearLabel, cover_url: book.coverUrl })
       : await supabase.from("library_items").delete().match({ book_id: book.id, status });
@@ -231,7 +258,7 @@ export const useLineas = create<LineasState>()((set, get) => ({
     if (previous?.id === user?.id) return;
 
     if (!user) {
-      set({ library: {} });
+      set({ library: {}, edgeVotes: {}, recVotes: {} });
       return;
     }
 
@@ -269,8 +296,93 @@ export const useLineas = create<LineasState>()((set, get) => ({
       library = withStatus(library, { id: row.book_id, title: row.title, author: row.author, yearLabel: row.year_label, coverUrl: row.cover_url }, row.status, true, row.created_at);
     }
     set({ library, libraryError: null });
+
+    const votes = await supabase.from("edge_votes").select("value, kg_edges(source, target, type)").limit(2000);
+    if (votes.error) {
+      console.error("[votos] load", votes.error);
+      return;
+    }
+    const edgeVotes: Record<string, Vote> = {};
+    for (const row of votes.data) {
+      if (row.kg_edges) edgeVotes[edgeKey(row.kg_edges as Pick<GraphEdge, "source" | "target" | "type">)] = row.value as Vote;
+    }
+    set({ edgeVotes });
+  },
+
+  voteEdge: async (edge, value) => {
+    const { user, graph, edgeVotes } = get();
+    const supabase = getBrowserSupabase();
+    if (!user || !supabase) return;
+    const key = edgeKey(edge);
+    const previous = edgeVotes[key];
+    const next = previous === value ? 0 : value;
+    const nodes = new Map((graph?.nodes ?? []).map((n) => [n.id, n]));
+    const source = nodes.get(edge.source);
+    const target = nodes.get(edge.target);
+    if (!source || !target) return;
+
+    // Optimista: la UI cambia ya; si la base falla, se revierte.
+    set((s) => ({ edgeVotes: withVote(s.edgeVotes, key, next), voteError: null }));
+    const { error } = await supabase.rpc("vote_edge", { p_source: canonicalNode(source), p_target: canonicalNode(target), p_edge: canonicalEdge(edge), p_value: next });
+    if (error) {
+      console.error("[votos]", error);
+      set((s) => ({ edgeVotes: withVote(s.edgeVotes, key, previous ?? 0), voteError: "No pudimos guardar tu voto. Probá de nuevo." }));
+    }
+  },
+
+  voteRecommendation: async (lane, value) => {
+    const { user, lanes, recVotes } = get();
+    const graph = currentOption(lanes[lane]);
+    const book = recommendedBook(graph);
+    if (!book) return;
+    if (!user || !getBrowserSupabase()) return;
+    if (recVotes[book.id] === value) return;
+    set((s) => ({ recVotes: { ...s.recVotes, [book.id]: value }, voteError: null }));
+    const ok = await recordSignal(get, lane, graph, value === 1 ? "up" : "down");
+    if (!ok) set((s) => ({ recVotes: withVote(s.recVotes, book.id, recVotes[book.id] ?? 0), voteError: "No pudimos guardar tu voto. Probá de nuevo." }));
   },
 }));
+
+function currentOption(lane: LaneState): ConnectionGraph | undefined {
+  return lane.options[lane.index];
+}
+
+function withVote(votes: Record<string, Vote>, key: string, value: Vote | 0): Record<string, Vote> {
+  const next = { ...votes };
+  if (value === 0) delete next[key];
+  else next[key] = value;
+  return next;
+}
+
+/** Lo que guarda el grafo canónico de un nodo: sin datos de catálogo ni marcas de esta búsqueda. */
+function canonicalNode(node: GraphNode): Json {
+  return { id: node.id, kind: node.kind, label: node.label, subtitle: node.subtitle ?? null, originalTitle: node.originalTitle ?? null, era: node.era };
+}
+
+function canonicalEdge(edge: GraphEdge): Json {
+  return { source: edge.source, target: edge.target, type: edge.type, confidence: edge.confidence, summary: edge.summary, explanation: edge.explanation, quote: edge.quote ?? null };
+}
+
+/** Señal sobre una recomendación (explícita o implícita). Sin sesión no se guarda. */
+async function recordSignal(get: Get, lane: Lane, graph: ConnectionGraph | undefined, signal: Enums<"rec_signal">): Promise<boolean> {
+  const supabase = getBrowserSupabase();
+  const { user, clues } = get();
+  const rec = graph?.recommendations[0];
+  if (!supabase || !user || !graph || !rec) return false;
+  const index = indexGraph(graph);
+  const nodes = rec.path.flatMap((id) => (index.nodes.get(id) ? [canonicalNode(index.nodes.get(id)!)] : []));
+  const edges = pathEdges(index, rec.path).map(canonicalEdge);
+  const { error } = await supabase.rpc("record_rec_signal", {
+    p_clues_key: keyOf(clues).slice(0, 2000),
+    p_lane: lane,
+    p_book_slug: rec.nodeId,
+    p_signal: signal,
+    p_nodes: nodes,
+    p_edges: edges,
+  });
+  if (error) console.error("[señales]", error);
+  return !error;
+}
 
 type Set = (partial: Partial<LineasState> | ((s: LineasState) => Partial<LineasState>)) => void;
 type Get = () => LineasState;

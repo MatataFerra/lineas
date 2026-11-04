@@ -52,16 +52,16 @@ export function laneSubgraph(graph: ConnectionGraph, rec: Recommendation): Conne
 }
 
 /** El libro recomendado de un carril. */
-export function recommendedBook(graph: ConnectionGraph): GraphNode | undefined {
-  const rec = graph.recommendations[0];
-  return rec ? graph.nodes.find((n) => n.id === rec.nodeId) : undefined;
+export function recommendedBook(graph: ConnectionGraph | undefined): GraphNode | undefined {
+  const rec = graph?.recommendations[0];
+  return rec ? graph!.nodes.find((n) => n.id === rec.nodeId) : undefined;
 }
 
 /** Clave para comparar autores: el apellido, sin tildes ni mayúsculas. */
 export function authorKey(author: string): string {
   const parts = author
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9 ]+/g, " ")
     .trim()
