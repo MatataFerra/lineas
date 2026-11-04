@@ -20,6 +20,7 @@ export function ResultsScreen() {
   const lanes = useLineas((s) => s.lanes);
   const status = useLineas((s) => s.status);
   const error = useLineas((s) => s.error);
+  const errorNeedsEdit = useLineas((s) => s.errorNeedsEdit);
   const search = useLineas((s) => s.search);
 
   // Si se entra directo a /resultados (o cambiaron las pistas), buscar.
@@ -76,12 +77,18 @@ export function ResultsScreen() {
         {status === "error" && (
           <div role="alert" className="mt-9 rounded-2xl border border-line bg-surface p-6">
             <p className="text-sm">{error}</p>
-            <button
-              type="button"
-              onClick={() => void search({ force: true })}
-              className="mt-4 h-10 rounded-full bg-ink px-5 text-[13px] text-bg">
-              Reintentar
-            </button>
+            {errorNeedsEdit ? (
+              <Link href="/" className="mt-4 inline-flex h-10 items-center rounded-full bg-ink px-5 text-[13px] text-bg">
+                Editar pistas
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void search({ force: true })}
+                className="mt-4 h-10 rounded-full bg-ink px-5 text-[13px] text-bg">
+                Reintentar
+              </button>
+            )}
           </div>
         )}
 

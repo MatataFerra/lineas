@@ -62,6 +62,8 @@ interface LineasState {
   /** "ready" apenas llega el primer carril. */
   status: Status;
   error: string | null;
+  /** El error es por las pistas (el filtro las rechazó): reintentar no sirve, hay que editarlas. */
+  errorNeedsEdit: boolean;
   /** Firma de las pistas con las que se armó `graph`. */
   graphKey: string | null;
   /** Libro (id de nodo) cuyo recorrido se muestra en el mapa. */
@@ -130,6 +132,7 @@ export const useLineas = create<LineasState>()((set, get) => ({
   graph: null,
   status: "idle",
   error: null,
+  errorNeedsEdit: false,
   graphKey: null,
   focus: null,
   user: null,
@@ -169,7 +172,7 @@ export const useLineas = create<LineasState>()((set, get) => ({
     searchAbort?.abort();
     const abort = new AbortController();
     searchAbort = abort;
-    set({ status: "loading", error: null, graphKey: key, lanes: emptyLanes(), graph: null, focus: null, recVotes: {} });
+    set({ status: "loading", error: null, errorNeedsEdit: false, graphKey: key, lanes: emptyLanes(), graph: null, focus: null, recVotes: {} });
 
     const applyEvent = (event: StreamEvent) => {
       if (event.type === "done") return;
@@ -199,7 +202,7 @@ export const useLineas = create<LineasState>()((set, get) => ({
     } catch (error) {
       if (abort.signal.aborted) return;
       if (get().graph) set({ lanes: settleLanes(get().lanes) });
-      else set({ status: "error", error: error instanceof Error ? error.message : "Algo salió mal." });
+      else set({ status: "error", error: error instanceof Error ? error.message : "Algo salió mal.", errorNeedsEdit: error instanceof BlockedError });
     }
   },
 
@@ -425,6 +428,8 @@ async function requestLane(set: Set, get: Get, lane: Lane) {
   }
 }
 
+class BlockedError extends Error {}
+
 /** POST /api/recommend y lectura del stream. Los errores antes del stream (400, 429) vienen como JSON. */
 async function streamRecommendations(body: { clues: Clue[]; lane?: Lane; exclude?: ExcludedBook[] }, signal: AbortSignal | undefined, onEvent: (event: StreamEvent) => void) {
   const response = await fetch("/api/recommend", {
@@ -435,7 +440,8 @@ async function streamRecommendations(body: { clues: Clue[]; lane?: Lane; exclude
   });
   if (!response.ok || !response.body) {
     const data: unknown = await response.json().catch(() => null);
-    throw new Error(typeof data === "object" && data && "error" in data ? String(data.error) : "Algo salió mal.");
+    const message = typeof data === "object" && data && "error" in data ? String(data.error) : "Algo salió mal.";
+    throw response.status === 422 ? new BlockedError(message) : new Error(message);
   }
   // El servidor ya valida, pero el cliente no confía a ciegas en la red: cada evento se valida al leerlo.
   await readEventStream(response.body, onEvent);
