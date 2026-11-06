@@ -46,3 +46,6 @@ next-env.d.ts
 
 # corridas de prueba del motor
 .engine-runs/
+.codex/
+.cursor/
+.impeccable/
