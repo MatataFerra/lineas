@@ -25,3 +25,11 @@
 - Diseña componentes modulares, legibles y fuertemente tipados.
 - Implementa la estrategia de _Cache Components_ nativa de Next.js 16 para optimizar el renderizado y el consumo de datos.
 - Deshabilita cualquier optimización implícita orientada a `react-compiler` manteniéndote en el modelo de ejecución estándar de React 19.
+
+## Estándares de Diseño UX/UI
+
+- **Mobile-First:** Diseña comenzando por la experiencia móvil y escala hacia pantallas grandes usando breakpoints nativos de Tailwind v4.
+- **Jerarquía Visual y Espaciado:** Mantén escalas de espaciado basadas en múltiplos de 4 ( Tailwind `gap-2`, `p-4`, `space-y-6`). Usar jerarquías claras en títulos y textos secundarios.
+- **Accesibilidad (A11y):** Todo elemento interactivo debe poseer estados `:focus-visible` claros, etiquetas `aria-label` en botones con íconos y contraste suficiente en texto.
+- **Componentes Atómicos:** Separa la lógica de presentación de la lógica de datos. Usa componentes pequeños, reutilizables y limpios.
+- **Micro-interacciones:** Agrega transiciones suaves (`transition-colors duration-200`, `active:scale-95`) para feedback inmediato de usuario.
