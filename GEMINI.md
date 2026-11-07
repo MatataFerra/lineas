@@ -1,0 +1,27 @@
+# Reglas y Guía de Desarrollo del Proyecto
+
+## 1. Stack Tecnológico
+
+- **Framework:** Next.js 16 (App Router, _Cache Components_ / `use cache`).
+- **Lenguaje:** TypeScript en modo estricto (`strict: true`, prohibido el uso de `any`).
+- **Estilos:** Tailwind CSS v4.
+- **Entorno de Ejecución:** Node.js 24.
+- **Biblioteca UI:** React 19 (con `react-compiler` **desactivado**).
+
+## 2. Metodología y Flujo de Trabajo
+
+- **Planificación previa (Spec-Driven):** Antes de modificar la arquitectura o tocar múltiples archivos, presenta una breve especificación del plan de cambios.
+- **Estrategia de Ramas y PRs:** Nunca apliques cambios directamente sobre la rama principal. Crea siempre una rama de trabajo usando la convención `feat/` (o `fix/`, `refactor/`) y genera la Pull Request correspondiente antes de modificar o integrar archivos base.
+- **Convención de Commits:** Usa la nomenclatura estandarizada: `feat:`, `fix:`, `docs:`, `style:`, `refactor:`, `test:`, `chore:`.
+- **Validación:** Comprueba tipos (`tsc --noEmit`), linter y tests antes de dar por finalizada una tarea.
+
+## 3. Seguridad y Privacidad (Estricto)
+
+- **Protección de Datos:** Bajo ningún concepto incluyas, transmitas o expongas el correo electrónico del usuario, tokens o datos sensibles en cabeceras HTTP (incluyendo la cabecera `User-Agent`), logs, código fuente o archivos de configuración.
+- **Manejo de Credenciales:** Toda clave o secreto debe gestionarse únicamente a través de variables de entorno locales (`.env.local`) que nunca deben incluirse en el control de versiones.
+
+## 4. Patrones de Código
+
+- Diseña componentes modulares, legibles y fuertemente tipados.
+- Implementa la estrategia de _Cache Components_ nativa de Next.js 16 para optimizar el renderizado y el consumo de datos.
+- Deshabilita cualquier optimización implícita orientada a `react-compiler` manteniéndote en el modelo de ejecución estándar de React 19.
