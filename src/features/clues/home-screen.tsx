@@ -30,7 +30,7 @@ export function HomeScreen() {
 
   return (
     <div className="flex min-h-dvh">
-      <InspirationArt />
+      <InspirationArt discoveries={clues.length} />
 
       <div className="flex min-w-0 flex-1 flex-col px-[22px] pt-5 pb-7 md:px-16 md:pt-7 md:pb-8">
         <SiteHeader />
