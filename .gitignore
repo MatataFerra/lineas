@@ -49,3 +49,6 @@ next-env.d.ts
 .codex/
 .cursor/
 .impeccable/
+
+# capturas y planes locales de las skills de diseño
+.taste-skill/
