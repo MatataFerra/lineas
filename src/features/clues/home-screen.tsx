@@ -2,13 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowRightIcon, CloseIcon, PlusIcon } from "@/components/icons";
+import { ArrowRightIcon, ClueKindIcon, CloseIcon, PlusIcon } from "@/components/icons";
 import { SiteHeader } from "@/components/site-header";
 import { CLUE_KIND_META } from "@/lib/graph/labels";
-import type { ClueKind } from "@/lib/graph/schema";
+import { MAX_CLUES, type ClueKind } from "@/lib/graph/schema";
 import { useLineas } from "@/lib/store";
 import { STARTER_IDEAS } from "./catalog";
 import { ClueDialog } from "./clue-dialog";
+import { InspirationArt } from "./inspiration-art";
 
 export function HomeScreen() {
   const router = useRouter();
@@ -19,6 +20,7 @@ export function HomeScreen() {
 
   const [draft, setDraft] = useState("");
   const [dialogKind, setDialogKind] = useState<ClueKind | null>(null);
+  const full = clues.length >= MAX_CLUES;
 
   const go = () => {
     if (clues.length === 0) return;
@@ -28,18 +30,18 @@ export function HomeScreen() {
 
   return (
     <div className="flex min-h-dvh">
-      <Landscape />
+      <InspirationArt />
 
       <div className="flex min-w-0 flex-1 flex-col px-[22px] pt-5 pb-7 md:px-16 md:pt-7 md:pb-8">
         <SiteHeader />
 
-        <main className="mt-12 max-w-[720px] md:mt-24">
-          <h1 className="font-serif text-[38px] leading-[1.08] tracking-[-0.015em] md:text-[58px] md:leading-[1.06]">
+        <main className="mt-12 w-full max-w-[1240px] md:mt-20 lg:mt-24">
+          <h1 className="font-serif text-[38px] leading-[1.08] tracking-[-0.015em] md:text-[58px] md:leading-[1.06] xl:text-[68px]">
             No sabés qué leer.
             <br />
             Pero sabés qué te mueve.
           </h1>
-          <p className="mt-4 text-[15px] leading-relaxed text-muted md:mt-5 md:text-base">
+          <p className="mt-4 max-w-[60ch] text-[15px] leading-relaxed text-muted md:mt-5 md:text-base">
             Un libro, una frase, una idea, una época.
             <br className="hidden md:block" /> Contanos qué te inspira y encontramos tu próxima lectura.
           </p>
@@ -59,37 +61,43 @@ export function HomeScreen() {
                   setDraft("");
                 }
               }}
-              placeholder="¿Qué libros, ideas o historias te inspiran?"
+              disabled={full}
+              placeholder={full ? `Llegaste a ${MAX_CLUES} pistas. Quitá una para sumar otra.` : "¿Qué libros, ideas o historias te inspiran?"}
               className="bg-transparent py-1 text-base outline-none placeholder:text-muted md:text-[15px]"
             />
-            <div className="flex flex-wrap items-center gap-2 md:gap-2.5">
-              {clues.map((clue) => (
-                <span
-                  key={clue.id}
-                  title={CLUE_KIND_META[clue.kind].label}
-                  className="inline-flex h-[34px] items-center gap-0.5 rounded-full border border-line bg-chip pr-0.5 pl-3 text-[13px] md:pl-3.5"
-                >
-                  {clue.label}
-                  <button type="button" aria-label={`Quitar ${clue.label}`} onClick={() => removeClue(clue.id)} className="flex size-[30px] items-center justify-center text-muted hover:text-ink">
-                    <CloseIcon size={12} strokeWidth={2} />
+            {/* Las pistas se acomodan en filas; la flecha queda siempre a la derecha, abajo. */}
+            <div className="flex items-end gap-3">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 md:gap-2.5">
+                {clues.map((clue) => (
+                  <span
+                    key={clue.id}
+                    title={CLUE_KIND_META[clue.kind].label}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-chip pr-0.5 pl-2.5 text-[13px] md:pl-3"
+                  >
+                    <ClueKindIcon kind={clue.kind} size={14} className="text-muted" />
+                    {clue.label}
+                    <button type="button" aria-label={`Quitar ${clue.label}`} onClick={() => removeClue(clue.id)} className="flex size-[30px] items-center justify-center text-muted hover:text-ink">
+                      <CloseIcon size={12} strokeWidth={2} />
+                    </button>
+                  </span>
+                ))}
+                {!full && (
+                  <button
+                    type="button"
+                    aria-label="Añadir pista"
+                    onClick={() => setDialogKind("book")}
+                    className="flex size-9 items-center justify-center rounded-lg text-ink hover:bg-chip"
+                  >
+                    <PlusIcon size={16} />
                   </button>
-                </span>
-              ))}
-              <button
-                type="button"
-                aria-label="Añadir pista"
-                onClick={() => setDialogKind("book")}
-                className="flex size-[34px] items-center justify-center rounded-full border border-dashed border-line text-muted hover:text-ink"
-              >
-                <PlusIcon size={14} />
-              </button>
-              <div className="flex-1" />
+                )}
+              </div>
               <button
                 type="button"
                 aria-label="Buscar lecturas"
                 onClick={go}
                 disabled={clues.length === 0}
-                className="flex size-11 items-center justify-center rounded-full bg-accent text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-40"
+                className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-40"
               >
                 <ArrowRightIcon />
               </button>
@@ -99,7 +107,8 @@ export function HomeScreen() {
           <button
             type="button"
             onClick={() => setDialogKind("book")}
-            className="mt-2 inline-flex items-center gap-2 py-3 text-[13px] font-medium text-accent md:mt-3 md:py-2 md:font-normal md:text-muted md:hover:text-ink"
+            disabled={full}
+            className="mt-2 inline-flex disabled:pointer-events-none disabled:opacity-0 items-center gap-2 py-3 text-[13px] font-medium text-accent md:mt-3 md:py-2 md:font-normal md:text-muted md:hover:text-ink"
           >
             <PlusIcon size={12} strokeWidth={2.2} />
             Añadir otra pista
@@ -112,7 +121,8 @@ export function HomeScreen() {
                 key={idea.label}
                 type="button"
                 onClick={() => addClue(idea.label, idea.kind)}
-                className="h-[38px] rounded-full border border-line px-4 text-[13px] hover:bg-chip md:px-[18px]"
+                disabled={full}
+                className="h-[38px] rounded-full border border-line px-4 text-[13px] hover:bg-chip disabled:opacity-40 disabled:hover:bg-transparent md:px-[18px]"
               >
                 {idea.label}
               </button>
@@ -144,17 +154,3 @@ export function HomeScreen() {
 }
 
 /** Franja de paisaje del diseño original: una ruta que se pierde en el horizonte. */
-function Landscape() {
-  return (
-    <div className="relative hidden max-w-[260px] flex-[0_0_18%] overflow-hidden md:block" aria-hidden="true">
-      <svg viewBox="0 0 200 820" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 size-full">
-        <rect width="200" height="820" className="fill-[#e4dccf] dark:fill-[#1c1a18]" />
-        <polygon points="0,330 40,270 80,300 120,240 160,290 200,250 200,820 0,820" className="fill-[#cec3b2] dark:fill-[#29261f]" />
-        <polygon points="0,420 50,360 95,400 140,340 200,390 200,820 0,820" className="fill-[#a69986] dark:fill-[#332f28]" />
-        <rect y="470" width="200" height="350" className="fill-[#8b7f6e] dark:fill-[#201e1a]" />
-        <polygon points="97,470 103,470 190,820 10,820" className="fill-[#4a443c] dark:fill-[#0c0b0a]" />
-        <line x1="100" y1="476" x2="100" y2="820" strokeWidth="2.5" strokeDasharray="12 16" className="stroke-[#f4f0e8] dark:stroke-[#d9b36a]" />
-      </svg>
-    </div>
-  );
-}

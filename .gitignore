@@ -50,3 +50,9 @@ next-env.d.ts
 
 # corridas de prueba del motor
 .engine-runs/
+.codex/
+.cursor/
+.impeccable/
+
+# capturas y planes locales de las skills de diseño
+.taste-skill/

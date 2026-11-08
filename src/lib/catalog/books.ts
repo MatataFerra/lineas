@@ -184,12 +184,12 @@ export function normalizeText(value: string): string {
     .trim();
 }
 
-function lastName(author: string): string {
+export function lastName(author: string): string {
   const parts = author.trim().split(/\s+/);
   return parts[parts.length - 1] ?? author;
 }
 
-function matches(title: string, author: string, candidateTitle?: string, candidateAuthors?: string[]): boolean {
+export function matches(title: string, author: string, candidateTitle?: string, candidateAuthors?: string[]): boolean {
   if (!candidateTitle || !candidateAuthors?.length) return false;
   const surname = normalizeText(lastName(author));
   const authorOk = candidateAuthors.some((a) => normalizeText(a).split(" ").includes(surname));

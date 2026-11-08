@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { BookCover } from "@/components/book-cover";
 import { ArrowRightIcon, CheckIcon, ClueKindIcon, CloseIcon, PlusIcon, SearchIcon } from "@/components/icons";
 import { CLUE_KIND_META, CLUE_KIND_ORDER } from "@/lib/graph/labels";
-import type { ClueKind } from "@/lib/graph/schema";
+import { MAX_CLUES, type ClueKind } from "@/lib/graph/schema";
 import { useLineas } from "@/lib/store";
 import { DESKTOP_QUERY, useMediaQuery } from "@/lib/use-media-query";
 import { searchCatalog, type CatalogItem } from "./catalog";
@@ -18,8 +18,8 @@ interface ClueDialogProps {
 
 /**
  * Agregar pistas.
- * Desktop: modal; elegir un resultado lo agrega y cierra.
- * Mobile: pantalla completa; se marcan y desmarcan varias pistas sin salir.
+ * Desktop: modal; mobile: pantalla completa. En los dos se marcan y desmarcan
+ * varias pistas sin salir; las elegidas se ven en el pie.
  *
  * Se monta solo mientras está abierto (el padre lo renderiza condicionalmente),
  * así cada apertura empieza limpia.
@@ -31,7 +31,6 @@ export function ClueDialog({ initialKind = "book", onClose, onSearch }: ClueDial
   const [query, setQuery] = useState("");
 
   const clues = useLineas((s) => s.clues);
-  const addClue = useLineas((s) => s.addClue);
   const toggleClue = useLineas((s) => s.toggleClue);
   const removeClue = useLineas((s) => s.removeClue);
 
@@ -46,22 +45,24 @@ export function ClueDialog({ initialKind = "book", onClose, onSearch }: ClueDial
   const exact = results.some((r) => r.label.toLowerCase() === trimmed.toLowerCase());
   const meta = CLUE_KIND_META[kind];
   const isChosen = (label: string) => clues.some((c) => c.label.toLowerCase() === label.toLowerCase());
+  const full = clues.length >= MAX_CLUES;
 
+  // Elegir no cierra el modal: se pueden sumar varias pistas seguidas y quitar las que sobran.
   const pick = (label: string) => {
-    if (isDesktop) {
-      addClue(label, kind);
-      onClose();
-    } else {
-      toggleClue(label, kind);
-      setQuery("");
-    }
+    toggleClue(label, kind);
+    setQuery("");
   };
 
   return (
     <dialog
       ref={ref}
       aria-label="Añadir pistas"
-      onClose={onClose}
+      onCancel={(e) => {
+        // Escape. No escuchamos "close": el cleanup del efecto cierra el <dialog> al desmontar
+        // (y en desarrollo React monta dos veces), y eso volvía a cerrar el modal recién abierto.
+        e.preventDefault();
+        onClose();
+      }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -97,11 +98,11 @@ export function ClueDialog({ initialKind = "book", onClose, onSearch }: ClueDial
         <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto pt-4 pb-6 md:mt-5 md:grid md:grid-cols-[280px_minmax(0,1fr)] md:gap-7 md:overflow-visible md:p-0">
           {/* Pistas actuales (mobile) */}
           <div className="md:hidden">
-            <div className="px-5 text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">Tus pistas · {clues.length}</div>
+            <div className="px-5 text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">Tus pistas · {clues.length} de {MAX_CLUES}</div>
             <div className="no-scrollbar mt-2.5 flex gap-2 overflow-x-auto px-5">
               {clues.length === 0 && <span className="text-[13px] text-muted">Todavía no agregaste ninguna.</span>}
               {clues.map((clue) => (
-                <span key={clue.id} className="inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-full border border-line bg-chip pr-0.5 pl-3 text-[13px] whitespace-nowrap">
+                <span key={clue.id} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-chip pr-0.5 pl-3 text-[13px] whitespace-nowrap">
                   <span className="text-[11px] text-muted">{CLUE_KIND_META[clue.kind].short}</span>
                   {clue.label}
                   <button type="button" aria-label={`Quitar ${clue.label}`} onClick={() => removeClue(clue.id)} className="flex size-[30px] items-center justify-center text-muted">
@@ -128,13 +129,17 @@ export function ClueDialog({ initialKind = "book", onClose, onSearch }: ClueDial
                   }}
                   className={[
                     "flex shrink-0 items-center gap-[7px] rounded-full border px-3.5 py-0 text-[13px] font-medium whitespace-nowrap h-10",
-                    "md:h-auto md:items-start md:gap-3.5 md:rounded-[10px] md:border-0 md:px-3 md:py-[11px] md:text-left md:whitespace-normal",
+                    "md:h-auto md:items-center md:gap-3.5 md:rounded-[10px] md:border-0 md:px-3 md:py-[11px] md:text-left md:whitespace-normal",
                     active ? "border-ink bg-ink text-bg md:bg-chip-active md:text-ink" : "border-line md:bg-transparent md:hover:bg-chip-active/60",
                   ].join(" ")}
                 >
-                  <ClueKindIcon kind={k} size={18} className={`shrink-0 md:mt-px ${active ? "md:text-accent" : "md:text-muted"}`} />
+                  <span
+                    aria-hidden="true"
+                    className={`flex shrink-0 items-center justify-center md:size-10 md:rounded-full md:border ${active ? "md:border-accent/30 md:bg-surface md:text-accent" : "md:border-line/70 md:bg-bg md:text-ink"}`}>
+                    <ClueKindIcon kind={k} size={18} className="md:size-[22px]" />
+                  </span>
                   <span className="flex flex-col gap-0.5">
-                    <span className="md:text-sm">{isDesktop ? m.label : m.short}</span>
+                    <span className="md:font-serif md:text-[15px] md:font-normal">{isDesktop ? m.label : m.short}</span>
                     <span className="hidden text-xs leading-snug font-normal text-muted md:block">{m.description}</span>
                   </span>
                 </button>
@@ -152,7 +157,7 @@ export function ClueDialog({ initialKind = "book", onClose, onSearch }: ClueDial
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && trimmed) {
+                  if (e.key === "Enter" && trimmed && !full) {
                     e.preventDefault();
                     pick(results[0]?.label ?? trimmed);
                   }
@@ -162,12 +167,13 @@ export function ClueDialog({ initialKind = "book", onClose, onSearch }: ClueDial
               />
             </label>
 
-            <div className="mt-5 mb-2 hidden text-[11px] font-semibold tracking-[0.08em] text-muted uppercase md:block">
+            <div className="mt-5 mb-2 hidden font-serif text-[15px] md:block">
               {trimmed ? "Resultados" : "Sugerencias"}
             </div>
 
             <div className="mt-2.5 flex flex-col md:mt-0 md:max-h-[360px] md:gap-0.5 md:overflow-y-auto">
-              {trimmed && !exact && (
+              {full && <p className="mb-2 rounded-xl bg-chip px-3.5 py-3 text-[13px]">Llegaste a {MAX_CLUES} pistas. Quitá una para sumar otra.</p>}
+              {trimmed && !exact && !full && (
                 <button
                   type="button"
                   onClick={() => pick(trimmed)}
@@ -178,7 +184,7 @@ export function ClueDialog({ initialKind = "book", onClose, onSearch }: ClueDial
                 </button>
               )}
               {results.map((item) => (
-                <ResultRow key={item.label} item={item} kind={kind} chosen={isChosen(item.label)} isDesktop={isDesktop} onPick={() => pick(item.label)} />
+                <ResultRow key={item.label} item={item} kind={kind} chosen={isChosen(item.label)} disabled={full && !isChosen(item.label)} onPick={() => pick(item.label)} />
               ))}
               {trimmed && results.length === 0 && (
                 <p className="mt-2 text-[13px] text-muted">No encontramos coincidencias. Podés agregarla igual como pista.</p>
@@ -199,9 +205,21 @@ export function ClueDialog({ initialKind = "book", onClose, onSearch }: ClueDial
             <ArrowRightIcon size={16} />
           </button>
         </div>
-        <div className="mt-[18px] hidden justify-end border-t border-line pt-3.5 md:flex">
-          <button type="button" onClick={onClose} className="h-10 px-4 text-[13px] text-muted hover:text-ink">
-            Cancelar
+        <div className="mt-[18px] hidden items-center gap-4 border-t border-line pt-3.5 md:flex">
+          <div aria-live="polite" className="no-scrollbar flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
+            {clues.length === 0 && <span className="text-[13px] text-muted">Todavía no elegiste ninguna pista.</span>}
+            {clues.map((clue) => (
+              <span key={clue.id} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-chip pr-0.5 pl-2.5 text-[13px] whitespace-nowrap">
+                <ClueKindIcon kind={clue.kind} size={14} className="text-muted" />
+                {clue.label}
+                <button type="button" aria-label={`Quitar ${clue.label}`} onClick={() => removeClue(clue.id)} className="flex size-[30px] items-center justify-center text-muted hover:text-ink">
+                  <CloseIcon size={12} strokeWidth={2} />
+                </button>
+              </span>
+            ))}
+          </div>
+          <button type="button" onClick={onClose} className="h-10 shrink-0 rounded-full bg-ink px-5 text-[13px] font-medium text-bg">
+            Listo
           </button>
         </div>
       </div>
@@ -209,15 +227,16 @@ export function ClueDialog({ initialKind = "book", onClose, onSearch }: ClueDial
   );
 }
 
-function ResultRow({ item, kind, chosen, isDesktop, onPick }: { item: CatalogItem; kind: ClueKind; chosen: boolean; isDesktop: boolean; onPick: () => void }) {
+function ResultRow({ item, kind, chosen, disabled, onPick }: { item: CatalogItem; kind: ClueKind; chosen: boolean; disabled: boolean; onPick: () => void }) {
   const words = item.label.split(" ");
   const initials = words[0].charAt(0) + (words.length > 1 ? words[words.length - 1].charAt(0) : "");
   return (
     <button
       type="button"
       onClick={onPick}
-      aria-pressed={isDesktop ? undefined : chosen}
-      className="flex items-center gap-3.5 border-b border-line py-2.5 text-left md:rounded-[10px] md:border-0 md:px-3 md:py-2 md:hover:bg-chip/60"
+      aria-pressed={chosen}
+      disabled={disabled}
+      className="flex items-center gap-3.5 border-b border-line py-2.5 text-left disabled:opacity-40 md:rounded-[10px] md:border-0 md:px-3 md:py-2 md:enabled:hover:bg-chip/60"
     >
       {kind === "book" ? (
         <BookCover id={item.label} title={item.label} size="sm" />
@@ -234,16 +253,12 @@ function ResultRow({ item, kind, chosen, isDesktop, onPick }: { item: CatalogIte
         <span className="text-sm leading-tight font-medium">{item.label}</span>
         <span className="text-xs text-muted">{item.detail}</span>
       </span>
-      {isDesktop ? (
-        <span className="rounded-full border border-line px-[9px] py-[3px] text-[11px] text-muted">{CLUE_KIND_META[kind].short}</span>
-      ) : (
-        <span
-          aria-hidden="true"
-          className={`flex size-7 shrink-0 items-center justify-center rounded-full border ${chosen ? "border-accent bg-accent text-accent-ink" : "border-line text-muted"}`}
-        >
-          {chosen ? <CheckIcon size={14} /> : <PlusIcon size={14} strokeWidth={2} />}
-        </span>
-      )}
+      <span
+        aria-hidden="true"
+        className={`flex size-7 shrink-0 items-center justify-center rounded-full border ${chosen ? "border-accent bg-accent text-accent-ink" : "border-line text-muted"}`}
+      >
+        {chosen ? <CheckIcon size={14} /> : <PlusIcon size={14} strokeWidth={2} />}
+      </span>
     </button>
   );
 }

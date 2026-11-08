@@ -29,7 +29,7 @@ export function LoginScreen({ next, linkError }: { next: string; linkError: bool
     <div className="min-h-dvh px-[22px] pt-5 pb-12 md:px-14 md:pt-7">
       <div className="mx-auto max-w-[1160px]">
         <SiteHeader />
-        <Link href={next} className="mt-5 inline-flex items-center gap-2 py-2 text-[13px] text-muted hover:text-ink md:mt-7">
+        <Link href={next} className="mt-5 inline-flex items-center gap-2 py-2 mb-4 text-[13px] text-muted hover:text-ink md:mb-8 md:mt-7">
           <ArrowLeftIcon size={14} />
           Volver
         </Link>

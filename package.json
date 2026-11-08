@@ -11,6 +11,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "engine:try": "node --conditions=react-server --env-file-if-exists=.env.local --import tsx scripts/try-engine.mts",
     "engine:compare": "node --conditions=react-server --env-file-if-exists=.env.local --import tsx scripts/compare-models.mts",
+    "explore:seed": "node --conditions=react-server --env-file-if-exists=.env.local --import tsx scripts/seed-rincones.mts",
     "models:pick": "node --env-file-if-exists=.env.local --import tsx scripts/pick-models.mts"
   },
   "dependencies": {
