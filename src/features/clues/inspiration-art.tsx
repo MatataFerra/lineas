@@ -1,16 +1,19 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { MAX_CLUES } from "@/lib/graph/schema";
 import { contour, pathOf, segmentEnds, type Cubic, type Pt } from "./trail";
 
 /**
  * La franja del costado de la home: un mapa de expedición. Del pliegue de un
- * libro abierto sale un sendero que sube entre lomas hasta un paso en la
- * sierra, donde asoma el sol (el mismo centro que tiene el mapa de la app).
- * A mitad de camino se bifurca: una rama queda sin explorar.
+ * libro abierto sale un sendero que sube hacia los orígenes de la literatura,
+ * pasando por un hito de cada época: las mariposas amarillas de Macondo, la
+ * ballena de Nantucket, un molino de La Mancha, la selva oscura de Dante y,
+ * en la cima, el templo del Olimpo con el sol detrás (el mismo centro que
+ * tiene el mapa de la app). En La Mancha se bifurca: una rama queda sin
+ * explorar.
  *
- * Las paradas del sendero son las pistas: cada pista que se suma enciende una
- * parada y el viajero camina hasta ella; si se quita, vuelve. Así el dibujo
- * responde a lo que se escribe al lado.
+ * Las paradas son las pistas: cada pista que se suma enciende un hito y el
+ * viajero camina hasta él; si se quita, vuelve. Así el dibujo responde a lo
+ * que se escribe al lado.
  *
  * Al cargar, el sendero se dibuja de abajo hacia arriba y las paradas
  * aparecen cuando el trazo pasa. Después quedan vivas solo tres cosas: el sol
@@ -25,13 +28,19 @@ const TRAIL: Cubic[] = [
   [[132, 556], [144, 522], [96, 500], [84, 468]],
   [[84, 468], [72, 436], [140, 430], [146, 396]],
   [[146, 396], [152, 362], [100, 350], [104, 320]],
-  [[104, 320], [106, 300], [122, 284], [124, 262]],
+  [[104, 320], [106, 296], [124, 282], [124, 246]],
 ];
 const TRAIL_D = pathOf(TRAIL);
 const ENDS = segmentEnds(TRAIL);
 
-// Una parada al final de cada tramo menos el penúltimo: la última es el paso de la sierra.
-const STOPS = [0, 1, 2, 3, 5].map((i) => ({ at: TRAIL[i][3], fraction: ENDS[i] }));
+/** Los hitos, de abajo hacia arriba: del siglo XX a la Antigüedad. Cada uno al final de un tramo (el penúltimo no tiene). */
+const STOPS: { segment: number; place: string; glyph: Pt; label: { at: Pt; anchor?: "start" | "middle" | "end" }; Landmark: () => ReactNode }[] = [
+  { segment: 0, place: "Macondo", glyph: [38, 636], label: { at: [38, 652] }, Landmark: Butterflies },
+  { segment: 1, place: "Nantucket", glyph: [164, 562], label: { at: [164, 578] }, Landmark: WhaleTail },
+  { segment: 2, place: "La Mancha", glyph: [112, 480], label: { at: [126, 476], anchor: "start" }, Landmark: Windmill },
+  { segment: 3, place: "Selva oscura", glyph: [116, 400], label: { at: [100, 394], anchor: "end" }, Landmark: Forest },
+  { segment: 5, place: "Olimpo", glyph: [124, 246], label: { at: [84, 230], anchor: "end" }, Landmark: Temple },
+];
 
 /** La rama que nadie recorrió: sale de la tercera parada y se pierde por el borde. */
 const UNEXPLORED: Cubic[] = [
@@ -46,7 +55,8 @@ const HILLS: { c: Pt; r: number; rings: number; squash: number }[] = [
   { c: [150, 330], r: 8, rings: 3, squash: 1.4 },
 ];
 
-const RIDGE = "M0 266 C 12 262, 18 254, 26 254 C 34 254, 38 262, 46 260 C 54 258, 58 244, 68 242 C 78 240, 84 256, 94 254 C 104 252, 108 246, 114 250 C 118 254, 120 262, 124 262 C 128 262, 134 248, 146 245 C 158 242, 164 254, 174 252 C 184 250, 190 246, 200 250";
+// La sierra, con el Olimpo en el medio: la cumbre plana donde se apoya el templo.
+const RIDGE = "M0 274 C 14 270, 22 264, 32 264 C 42 264, 50 270, 60 266 C 72 262, 84 256, 96 254 C 104 252, 110 248, 115 246 L 133 246 C 138 248, 144 254, 154 256 C 166 258, 174 264, 186 262 C 192 261, 196 260, 200 260";
 
 const DRAW_FROM = 0.3;
 const DRAW_FOR = 1.6;
@@ -57,7 +67,7 @@ const passes = (fraction: number) => DRAW_FROM + DRAW_FOR * fraction;
 
 export function InspirationArt({ discoveries }: { discoveries: number }) {
   const lit = Math.max(0, Math.min(discoveries, MAX_CLUES, STOPS.length));
-  const travelled = lit === 0 ? 0 : STOPS[lit - 1].fraction;
+  const travelled = lit === 0 ? 0 : ENDS[STOPS[lit - 1].segment];
 
   return (
     <div className="relative hidden max-w-[260px] flex-[0_0_18%] overflow-hidden lg:block" aria-hidden="true">
@@ -91,7 +101,7 @@ export function InspirationArt({ discoveries }: { discoveries: number }) {
             <path d={TRAIL_D} pathLength={1} fill="none" stroke="#fff" strokeWidth="12" strokeLinecap="round" className="art-draw" style={{ ...delay(DRAW_FROM), ["--dur" as string]: `${DRAW_FOR}s` }} />
           </mask>
           <mask id="art-reveal-unexplored" maskUnits="userSpaceOnUse">
-            <path d={pathOf(UNEXPLORED)} pathLength={1} fill="none" stroke="#fff" strokeWidth="10" strokeLinecap="round" className="art-draw" style={{ ...delay(passes(STOPS[2].fraction)), ["--dur" as string]: "1.1s" }} />
+            <path d={pathOf(UNEXPLORED)} pathLength={1} fill="none" stroke="#fff" strokeWidth="10" strokeLinecap="round" className="art-draw" style={{ ...delay(passes(ENDS[2])), ["--dur" as string]: "1.1s" }} />
           </mask>
         </defs>
 
@@ -117,33 +127,17 @@ export function InspirationArt({ discoveries }: { discoveries: number }) {
           <path d={`M${HILLS[1].c[0] - 3} ${HILLS[1].c[1] + 2} l 3 -5 3 5 z`} className="fill-ink/30" />
         </g>
 
-        {/* El mar de abajo, en tres trazos de ola. */}
-        <g fill="none" strokeWidth="0.7" strokeLinecap="round" className="art-fade stroke-ink/30" style={delay(0.2)}>
-          <path d="M22 652 q 4 -3, 8 0 t 8 0 t 8 0" />
-          <path d="M32 662 q 4 -3, 8 0 t 8 0" />
-          <path d="M18 670 q 4 -3, 8 0 t 8 0 t 8 0 t 8 0" />
-        </g>
-
         {/* El sol detrás de la sierra: el destino. */}
         <g className="art-pop" style={delay(passes(1) - 0.2)}>
-          <circle cx="124" cy="226" r="70" fill="url(#art-glow)" className="art-breathe" />
-          <circle cx="124" cy="226" r="36" className="fill-accent" />
+          <circle cx="124" cy="222" r="68" fill="url(#art-glow)" className="art-breathe" />
+          <circle cx="124" cy="222" r="34" className="fill-accent" />
         </g>
-        <path d={`${RIDGE} L 200 290 L 0 290 Z`} className="fill-[#e6ddcf] dark:fill-[#1c1a18]" />
+        <path d={`${RIDGE} L 200 300 L 0 300 Z`} className="fill-[#e6ddcf] dark:fill-[#1c1a18]" />
         <path d={RIDGE} fill="none" strokeWidth="0.9" strokeLinejoin="round" className="stroke-ink/45" />
 
-        {/* Topónimos. */}
-        <g className="fill-ink/60 font-serif italic" fontSize="9">
-          <text x="24" y="686" className="art-fade" style={delay(2)}>
-            Mar de la nostalgia
-          </text>
-          <text x="150" y="488" textAnchor="middle" className="art-fade" style={delay(2.08)}>
-            Paso Beat
-          </text>
-          <text x="26" y="312" transform="rotate(-6 26 312)" className="art-fade" style={delay(2.16)}>
-            Tierra incógnita
-          </text>
-        </g>
+        <text x="26" y="312" transform="rotate(-6 26 312)" fontSize="9" className="art-fade fill-ink/60 font-serif italic" style={delay(2)}>
+          Tierra incógnita
+        </text>
 
         <Compass />
 
@@ -158,7 +152,7 @@ export function InspirationArt({ discoveries }: { discoveries: number }) {
         </g>
 
         {STOPS.map((s, i) => (
-          <Stop key={i} at={s.at} lit={i < lit} appear={passes(s.fraction)} />
+          <Stop key={s.place} stop={s} lit={i < lit} appear={passes(ENDS[s.segment])} />
         ))}
 
         <Book />
@@ -172,25 +166,135 @@ export function InspirationArt({ discoveries }: { discoveries: number }) {
   );
 }
 
-/** Una parada: un lomo de libro parado junto al sendero, apagado hasta que llega una pista. */
-function Stop({ at: [x, y], lit, appear }: { at: Pt; lit: boolean; appear: number }) {
+/**
+ * Un hito: una marca sobre el sendero, el dibujo al costado y su nombre.
+ * Apagado se ve tenue; cuando llega una pista, se enciende al llegar el viajero.
+ */
+function Stop({ stop, lit, appear }: { stop: (typeof STOPS)[number]; lit: boolean; appear: number }) {
+  const [px, py] = TRAIL[stop.segment][3];
+  const { Landmark } = stop;
   return (
-    <g transform={`translate(${x + 7} ${y})`} data-lit={lit || undefined} className="art-stop">
+    <g data-lit={lit || undefined} className="art-stop">
       <g className="art-pop" style={delay(appear)}>
-        <rect x="-4.5" y="-15" width="9" height="14" rx="1.2" strokeWidth="0.8" className="fill-[#e6ddcf] stroke-ink/40 dark:fill-[#1c1a18]" />
-        <g className="art-stop-lit">
-          <rect x="-4.5" y="-15" width="9" height="14" rx="1.2" className="fill-ink" />
-          <rect x="-4.5" y="-11.5" width="9" height="2" className="fill-accent" />
-          <rect x="-2" y="-6" width="4" height="0.8" className="fill-bg/60" />
+        <circle cx={px} cy={py} r="2.8" strokeWidth="0.8" className="fill-[#e6ddcf] stroke-ink/45 dark:fill-[#1c1a18]" />
+        <circle cx={px} cy={py} r="2.8" className="art-lit-only fill-accent" />
+        <g transform={`translate(${stop.glyph[0]} ${stop.glyph[1]})`}>
+          <g className="art-landmark">
+            <Landmark />
+          </g>
+        </g>
+      </g>
+      <text x={stop.label.at[0]} y={stop.label.at[1]} textAnchor={stop.label.anchor ?? "middle"} fontSize="8.5" className="art-fade art-place fill-ink/60 font-serif italic" style={delay(appear + 0.15)}>
+        {stop.place}
+      </text>
+    </g>
+  );
+}
+
+/* Los dibujos de cada hito, con la base en (0, 0). */
+
+/** Macondo: las mariposas amarillas de Mauricio Babilonia. */
+function Butterflies() {
+  return (
+    <g>
+      {(
+        [
+          [-8, -13, 1, -18],
+          [6, -21, 0.8, 16],
+          [10, -6, 0.65, -4],
+        ] as const
+      ).map(([x, y, k, r]) => (
+        <g key={`${x}`} transform={`translate(${x} ${y}) rotate(${r}) scale(${k})`}>
+          <path d="M0 0 C -5 -9, -12 -5, -8 0 C -6 2.5, -2 1.5, 0 0 Z M0 0 C 5 -9, 12 -5, 8 0 C 6 2.5, 2 1.5, 0 0 Z" strokeWidth="0.7" className="art-wing stroke-ink" />
+          <path d="M0 0 C -4 2, -6 6, -2.5 6.5 C -1 6, 0 3, 0 0 Z M0 0 C 4 2, 6 6, 2.5 6.5 C 1 6, 0 3, 0 0 Z" strokeWidth="0.7" className="art-wing stroke-ink" />
+          <path d="M0 -3 V 4 M0 -3 l -1.6 -3 M0 -3 l 1.6 -3" fill="none" strokeWidth="0.8" strokeLinecap="round" className="stroke-ink" />
+        </g>
+      ))}
+    </g>
+  );
+}
+
+/** Nantucket: la cola de la ballena blanca, hundiéndose. */
+function WhaleTail() {
+  return (
+    <g>
+      <path d="M0 0 C -1 -6, -2 -10, -3 -13 C -7 -14, -12 -16, -15 -21 C -9 -20, -4 -18, 0 -15 C 4 -18, 9 -20, 15 -21 C 12 -16, 7 -14, 3 -13 C 2 -10, 1 -6, 0 0 Z" className="fill-ink" />
+      <g fill="none" strokeWidth="0.8" strokeLinecap="round" className="stroke-ink/55">
+        <path d="M-17 1 q 4 -3, 8 0 t 8 0 t 8 0 t 8 0" />
+        <path d="M-12 5 q 4 -3, 8 0 t 8 0 t 8 0" />
+      </g>
+      <g className="art-lit-only fill-accent">
+        <circle cx="-15" cy="-17" r="0.9" />
+        <circle cx="-13" cy="-13" r="0.7" />
+        <circle cx="15" cy="-17" r="0.9" />
+        <circle cx="13.5" cy="-12.5" r="0.7" />
+      </g>
+    </g>
+  );
+}
+
+/** La Mancha: un molino, el gigante de don Quijote. Al encenderse, da una vuelta. */
+function Windmill() {
+  return (
+    <g strokeLinejoin="round">
+      <path d="M-5 0 L -3.6 -16 L 3.6 -16 L 5 0 Z" strokeWidth="0.8" className="fill-[#e6ddcf] stroke-ink dark:fill-[#1c1a18]" />
+      <path d="M-4.6 -16 L 0 -21.5 L 4.6 -16 Z" className="fill-ink" />
+      <path d="M-1.2 0 V -4 a 1.2 1.2 0 0 1 2.4 0 V 0 Z" className="fill-ink" />
+      <g transform="translate(0 -18)">
+        <g className="art-sails">
+          {[45, 135, 225, 315].map((a) => (
+            <g key={a} transform={`rotate(${a})`} fill="none" strokeWidth="0.6" className="stroke-ink">
+              <path d="M0 0 V -14" />
+              <rect x="0.6" y="-14" width="3.4" height="10" />
+              <path d="M2.3 -14 V -4 M0.6 -9 H 4" strokeWidth="0.4" />
+            </g>
+          ))}
+          <circle r="1.3" className="fill-ink" />
         </g>
       </g>
     </g>
   );
 }
 
+/** La selva oscura de Dante; encendida, la estrella de la salida: «a riveder le stelle». */
+function Forest() {
+  return (
+    <g>
+      {(
+        [
+          [-9, 17],
+          [9, 15],
+          [0, 24],
+        ] as const
+      ).map(([x, h]) => (
+        <g key={x}>
+          <path d={`M${x} 0 V -3`} strokeWidth="1" className="stroke-ink" />
+          <path d={`M${x - 6} -3 L ${x} ${-h * 0.62} L ${x + 6} -3 Z M${x - 4.6} ${-h * 0.45} L ${x} ${-h} L ${x + 4.6} ${-h * 0.45} Z`} className="fill-ink" />
+        </g>
+      ))}
+      <path d="M0 -33 l 0.9 2.6 2.6 0.9 -2.6 0.9 -0.9 2.6 -0.9 -2.6 -2.6 -0.9 2.6 -0.9 z" className="art-lit-only fill-accent" />
+    </g>
+  );
+}
+
+/** El Olimpo: un templo en la cumbre, recortado contra el sol. */
+function Temple() {
+  return (
+    <g strokeLinejoin="round">
+      <path d="M-14 0 H 14 V -2.2 H -14 Z" className="fill-ink" />
+      {[-10, -4, 2, 8].map((x) => (
+        <rect key={x} x={x} y="-14" width="2.4" height="11.8" strokeWidth="0.5" className="art-column fill-[#f4efe6] stroke-ink dark:fill-[#d9d2c4]" />
+      ))}
+      <path d="M-12.5 -14 H 12.5 V -16.4 H -12.5 Z" className="fill-ink" />
+      <path d="M-14 -16.4 L 0 -24 L 14 -16.4 Z" className="fill-ink" />
+      <path d="M-8.5 -17.6 L 0 -22 L 8.5 -17.6 Z" className="art-lit-only fill-[#f4efe6] dark:fill-[#d9d2c4]" />
+    </g>
+  );
+}
+
 function Compass() {
   return (
-    <g transform="translate(36 556)">
+    <g transform="translate(36 560)">
       <g className="art-pop" style={delay(1)}>
         <circle r="15" fill="none" strokeWidth="0.7" className="stroke-ink/35" />
         <circle r="11.5" fill="none" strokeWidth="0.4" strokeDasharray="0.8 2.2" className="stroke-ink/35" />

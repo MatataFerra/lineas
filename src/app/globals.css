@@ -211,20 +211,42 @@ dialog::backdrop {
   offset-rotate: 0deg;
   transition: offset-distance 900ms var(--ease-strong-in-out);
 }
-/* Una parada se enciende cuando el viajero ya casi llegó; se apaga en el acto. */
-.art-stop-lit {
-  opacity: 0;
-  transform: scale(0.6);
+/* Un hito apagado se ve tenue; se enciende cuando el viajero ya casi llegó y se apaga en el acto. */
+.art-landmark {
+  opacity: 0.4;
+  transform: scale(0.9);
   transform-box: fill-box;
   transform-origin: 50% 100%;
   transition:
     opacity 240ms var(--ease-strong-out),
     transform 240ms var(--ease-strong-out);
 }
-.art-stop[data-lit] .art-stop-lit {
+.art-lit-only {
+  opacity: 0;
+  transition: opacity 240ms var(--ease-strong-out);
+}
+.art-wing {
+  fill: transparent;
+  transition: fill 240ms var(--ease-strong-out);
+}
+.art-sails {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.art-stop[data-lit] .art-landmark,
+.art-stop[data-lit] .art-lit-only {
   opacity: 1;
   transform: none;
   transition-delay: 600ms;
+}
+.art-stop[data-lit] .art-wing {
+  fill: #d9a441;
+  transition-delay: 600ms;
+}
+/* El molino da una vuelta al encenderse. */
+.art-stop[data-lit] .art-sails {
+  rotate: 360deg;
+  transition: rotate 1.4s var(--ease-strong-out) 600ms;
 }
 @keyframes art-draw {
   from {
@@ -297,7 +319,10 @@ dialog::backdrop {
     stroke-dashoffset: 0;
   }
   .art-traveler,
-  .art-stop-lit {
+  .art-landmark,
+  .art-lit-only,
+  .art-wing,
+  .art-sails {
     transition: none;
   }
 }
