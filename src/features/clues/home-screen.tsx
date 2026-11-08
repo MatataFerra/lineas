@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ArrowRightIcon, ClueKindIcon, CloseIcon, PlusIcon } from "@/components/icons";
 import { SiteHeader } from "@/components/site-header";
 import { CLUE_KIND_META } from "@/lib/graph/labels";
@@ -9,9 +9,9 @@ import { MAX_CLUES, type ClueKind } from "@/lib/graph/schema";
 import { useLineas } from "@/lib/store";
 import { STARTER_IDEAS } from "./catalog";
 import { ClueDialog } from "./clue-dialog";
-import { InspirationArt } from "./inspiration-art";
 
-export function HomeScreen() {
+/** `art` es la franja del costado; llega del servidor porque se elige con una variable de entorno. */
+export function HomeScreen({ art }: { art: ReactNode }) {
   const router = useRouter();
   const clues = useLineas((s) => s.clues);
   const addClue = useLineas((s) => s.addClue);
@@ -30,7 +30,7 @@ export function HomeScreen() {
 
   return (
     <div className="flex min-h-dvh">
-      <InspirationArt />
+      {art}
 
       <div className="flex min-w-0 flex-1 flex-col px-[22px] pt-5 pb-7 md:px-16 md:pt-7 md:pb-8">
         <SiteHeader />

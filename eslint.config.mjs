@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Bocetos locales, fuera del repo.
+    "design/**",
   ]),
 ]);
 
