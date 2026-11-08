@@ -56,3 +56,6 @@ next-env.d.ts
 
 # capturas y planes locales de las skills de diseño
 .taste-skill/
+
+# bocetos y propuestas de diseño: viven solo en local
+design/
