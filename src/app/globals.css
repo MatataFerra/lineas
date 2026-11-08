@@ -18,6 +18,9 @@
   --accent-ink: #ffffff;
   --scrim: rgb(30 28 25 / 0.3);
   --art-fold: #d8cdbb;
+  /* Curvas de movimiento: salida enérgica para lo que aparece, ida y vuelta para lo que se traslada. */
+  --ease-strong-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-strong-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   color-scheme: light;
 }
 
@@ -164,32 +167,38 @@ dialog::backdrop {
 }
 
 /* ---------------------------------------------------------------------------
-   Ilustración de la home (features/clues/inspiration-art.tsx)
-   Al cargar: el renglón y el tallo se dibujan, las hojas se despliegan y cada
-   escena florece cuando el trazo llega. Después: vaivén, una luz que sube por
-   el tallo, letras que se escapan, estrellas que titilan, notas que se van.
+   Mapa de la home (features/clues/inspiration-art.tsx)
+   Una sola entrada: el sendero se dibuja, las paradas aparecen cuando el trazo
+   pasa, la brújula se asienta y asoma el sol. Después, solo tres cosas vivas:
+   el sol respira, la rama sin explorar avanza y las páginas se abren apenas.
+   El viajero y las paradas encendidas responden a las pistas con transiciones.
    ------------------------------------------------------------------------ */
 .art-draw {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: art-draw var(--dur, 0.9s) cubic-bezier(0.45, 0, 0.2, 1) var(--delay, 0s) both;
+  animation: art-draw var(--dur, 0.9s) var(--ease-strong-in-out) var(--delay, 0s) both;
 }
 .art-pop {
   transform-box: fill-box;
   transform-origin: center;
-  animation: art-pop 0.9s cubic-bezier(0.2, 1.3, 0.4, 1) var(--delay, 0s) both;
+  animation: art-pop 0.5s var(--ease-strong-out) var(--delay, 0s) both;
 }
-.art-unfold {
-  transform-box: view-box;
-  transform-origin: 0 0;
-  animation: art-unfold 0.8s cubic-bezier(0.2, 1.2, 0.4, 1) var(--delay, 0s) both;
+.art-fade {
+  animation: art-fade 0.8s ease-out var(--delay, 0s) both;
 }
-.art-turn {
-  transform-box: view-box;
-  transform-origin: 100px 740px;
-  animation: art-turn 6s ease-in-out infinite alternate;
+.art-breathe {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: art-breathe 6s ease-in-out infinite;
 }
-/* Las dos mitades del libro giran desde el lomo, en espejo: se abren y se cierran apenas. */
+.art-march {
+  animation: art-march 8s linear infinite;
+}
+/* La aguja gira, se pasa y se asienta: una vez. */
+.art-needle {
+  animation: art-needle 0.7s var(--ease-strong-out) var(--delay, 0s) both;
+}
+/* Las dos mitades del libro giran desde el lomo, en espejo. */
 .art-page {
   transform-box: view-box;
   transform-origin: 100px 768px;
@@ -198,74 +207,72 @@ dialog::backdrop {
 .art-page-r {
   --page-dir: -1;
 }
-.art-flap {
-  transform-box: view-box;
-  transform-origin: 0 -1.5px;
-  animation: art-flap 1.6s ease-in-out infinite;
+.art-traveler {
+  offset-rotate: 0deg;
+  transition: offset-distance 900ms var(--ease-strong-in-out);
 }
-.art-drift {
-  animation: art-drift 7s ease-in-out infinite alternate;
-}
-.art-breathe {
+/* Una parada se enciende cuando el viajero ya casi llegó; se apaga en el acto. */
+.art-stop-lit {
+  opacity: 0;
+  transform: scale(0.6);
   transform-box: fill-box;
-  transform-origin: center;
-  animation: art-breathe 5.5s ease-in-out infinite;
+  transform-origin: 50% 100%;
+  transition:
+    opacity 240ms var(--ease-strong-out),
+    transform 240ms var(--ease-strong-out);
 }
-.art-twinkle {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: art-twinkle 2.6s ease-in-out var(--delay, 0s) infinite;
+.art-stop[data-lit] .art-stop-lit {
+  opacity: 1;
+  transform: none;
+  transition-delay: 600ms;
 }
-.art-spin {
-  transform-box: view-box;
-  animation: lineas-orbit 22s linear infinite;
-}
-.art-note {
-  animation: art-note 3.6s ease-out var(--delay, 0s) infinite;
-}
-.art-rise {
-  animation: art-rise 9s linear var(--delay, 0s) infinite;
-}
-/* Con extremos redondeados, un trazo sin dibujar igual deja un punto: se oculta hasta que arranca. */
 @keyframes art-draw {
   from {
     stroke-dashoffset: 1;
-    opacity: 0;
-  }
-  1% {
-    opacity: 1;
   }
   to {
     stroke-dashoffset: 0;
-    opacity: 1;
   }
 }
 @keyframes art-pop {
   from {
     opacity: 0;
-    transform: scale(0.3);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
+    transform: scale(0.6);
   }
 }
-@keyframes art-unfold {
+@keyframes art-fade {
   from {
     opacity: 0;
-    transform: scale(0, 0.2);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
   }
 }
-@keyframes art-turn {
-  from {
-    transform: rotate(-2deg) scaleX(0.96);
+@keyframes art-breathe {
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: scale(0.94);
   }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+@keyframes art-march {
   to {
-    transform: rotate(1.5deg) scaleX(1.02);
+    stroke-dashoffset: -30;
+  }
+}
+@keyframes art-needle {
+  0% {
+    rotate: -60deg;
+  }
+  60% {
+    rotate: 14deg;
+  }
+  82% {
+    rotate: -5deg;
+  }
+  100% {
+    rotate: 0deg;
   }
 }
 @keyframes art-page {
@@ -276,93 +283,21 @@ dialog::backdrop {
     transform: rotate(calc(var(--page-dir, 1) * -1.4deg));
   }
 }
-@keyframes art-flap {
-  0%,
-  100% {
-    transform: scaleY(1);
-  }
-  50% {
-    transform: scaleY(-0.35);
-  }
-}
-@keyframes art-drift {
-  from {
-    translate: -3px 0;
-  }
-  to {
-    translate: 4px -1px;
-  }
-}
-@keyframes art-breathe {
-  0%,
-  100% {
-    opacity: 0.55;
-    transform: scale(0.92);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.06);
-  }
-}
-@keyframes art-twinkle {
-  0%,
-  100% {
-    opacity: 0.25;
-    transform: scale(0.7);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.15);
-  }
-}
-@keyframes art-note {
-  0% {
-    opacity: 0;
-    translate: 0 4px;
-  }
-  25% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    translate: 10px -26px;
-  }
-}
-@keyframes art-rise {
-  0% {
-    opacity: 0;
-    translate: 0 0;
-  }
-  12% {
-    opacity: 0.8;
-  }
-  70% {
-    opacity: 0.35;
-  }
-  100% {
-    opacity: 0;
-    translate: 8px -190px;
-  }
-}
 @media (prefers-reduced-motion: reduce) {
   .art-draw,
   .art-pop,
-  .art-unfold,
-  .art-turn,
-  .art-page,
-  .art-flap,
-  .art-drift,
+  .art-fade,
   .art-breathe,
-  .art-twinkle,
-  .art-spin,
-  .art-note,
-  .art-rise {
+  .art-march,
+  .art-needle,
+  .art-page {
     animation: none;
   }
   .art-draw {
     stroke-dashoffset: 0;
   }
-  .art-note {
-    opacity: 0;
+  .art-traveler,
+  .art-stop-lit {
+    transition: none;
   }
 }

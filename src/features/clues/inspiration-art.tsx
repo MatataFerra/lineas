@@ -1,63 +1,72 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties } from "react";
+import { MAX_CLUES } from "@/lib/graph/schema";
+import { contour, pathOf, segmentEnds, type Cubic, type Pt } from "./trail";
 
 /**
- * La franja del costado de la home. De entre las páginas de un libro abierto
- * sale un trazo de tinta que crece como una planta: brota hojas y se ramifica
- * hacia lo que inspira (la noche, la música, un pájaro de papel, las
- * estrellas) hasta un sol, el mismo centro que tiene el mapa.
+ * La franja del costado de la home: un mapa de expedición. Del pliegue de un
+ * libro abierto sale un sendero que sube entre lomas hasta un paso en la
+ * sierra, donde asoma el sol (el mismo centro que tiene el mapa de la app).
+ * A mitad de camino se bifurca: una rama queda sin explorar.
  *
- * Al cargar, todo se dibuja de abajo hacia arriba; después las escenas tienen
- * su propio pulso y las páginas del libro respiran (clases art-* en
- * globals.css). Con movimiento reducido queda quieta y completa.
+ * Las paradas del sendero son las pistas: cada pista que se suma enciende una
+ * parada y el viajero camina hasta ella; si se quita, vuelve. Así el dibujo
+ * responde a lo que se escribe al lado.
+ *
+ * Al cargar, el sendero se dibuja de abajo hacia arriba y las paradas
+ * aparecen cuando el trazo pasa. Después quedan vivas solo tres cosas: el sol
+ * respira, la rama sin explorar avanza muy despacio y las páginas del libro
+ * se abren apenas. Todo en globals.css (clases art-*); con movimiento
+ * reducido queda quieta y completa.
  */
 
-type Pt = [number, number];
-/** Un tramo cúbico: inicio, dos controles y fin. */
-type Cubic = [Pt, Pt, Pt, Pt];
-
-const STEM: Cubic[][] = [
-  [
-    [[100, 744], [100, 704], [94, 668], [100, 636]],
-    [[100, 636], [106, 606], [96, 580], [104, 552]],
-  ],
-  [
-    [[104, 552], [112, 522], [122, 498], [118, 470]],
-    [[118, 470], [114, 440], [132, 404], [128, 370]],
-  ],
-  [
-    [[128, 370], [124, 336], [132, 300], [128, 270]],
-    [[128, 270], [126, 252], [126, 238], [126, 222]],
-  ],
+const TRAIL: Cubic[] = [
+  [[100, 704], [102, 676], [70, 664], [64, 628]],
+  [[64, 628], [58, 592], [120, 590], [132, 556]],
+  [[132, 556], [144, 522], [96, 500], [84, 468]],
+  [[84, 468], [72, 436], [140, 430], [146, 396]],
+  [[146, 396], [152, 362], [100, 350], [104, 320]],
+  [[104, 320], [106, 300], [122, 284], [124, 262]],
 ];
-// Grosor del tallo al empezar y al terminar cada tramo: de pincel cargado a punta fina.
-const STEM_WIDTH: [number, number][] = [
-  [5.2, 3.4],
-  [3.4, 2.3],
-  [2.3, 1.2],
+const TRAIL_D = pathOf(TRAIL);
+const ENDS = segmentEnds(TRAIL);
+
+// Una parada al final de cada tramo menos el penúltimo: la última es el paso de la sierra.
+const STOPS = [0, 1, 2, 3, 5].map((i) => ({ at: TRAIL[i][3], fraction: ENDS[i] }));
+
+/** La rama que nadie recorrió: sale de la tercera parada y se pierde por el borde. */
+const UNEXPLORED: Cubic[] = [
+  [[84, 468], [62, 446], [38, 440], [30, 410]],
+  [[30, 410], [22, 380], [36, 356], [16, 328]],
 ];
 
-const BRANCH: Record<"moon" | "music" | "bird" | "stars", Cubic> = {
-  moon: [[104, 552], [86, 530], [62, 514], [54, 492]],
-  music: [[118, 470], [136, 464], [150, 462], [158, 452]],
-  bird: [[128, 370], [108, 358], [86, 356], [72, 346]],
-  stars: [[128, 270], [142, 272], [152, 272], [160, 264]],
-};
+// Las lomas: centro, radio del anillo de adentro, cuántos anillos y cuánto se estiran a lo ancho.
+const HILLS: { c: Pt; r: number; rings: number; squash: number }[] = [
+  { c: [156, 622], r: 12, rings: 5, squash: 1.3 },
+  { c: [44, 432], r: 10, rings: 4, squash: 1.2 },
+  { c: [150, 330], r: 8, rings: 3, squash: 1.4 },
+];
+
+const RIDGE = "M0 266 C 12 262, 18 254, 26 254 C 34 254, 38 262, 46 260 C 54 258, 58 244, 68 242 C 78 240, 84 256, 94 254 C 104 252, 108 246, 114 250 C 118 254, 120 262, 124 262 C 128 262, 134 248, 146 245 C 158 242, 164 254, 174 252 C 184 250, 190 246, 200 250";
+
+const DRAW_FROM = 0.3;
+const DRAW_FOR = 1.6;
 
 const delay = (s: number) => ({ "--delay": `${s}s` }) as CSSProperties;
+/** Cuándo pasa el trazo por una fracción del sendero (aproximado: el trazo acelera y frena). */
+const passes = (fraction: number) => DRAW_FROM + DRAW_FOR * fraction;
 
-export function InspirationArt() {
+export function InspirationArt({ discoveries }: { discoveries: number }) {
+  const lit = Math.max(0, Math.min(discoveries, MAX_CLUES, STOPS.length));
+  const travelled = lit === 0 ? 0 : STOPS[lit - 1].fraction;
+
   return (
-    <div className="relative hidden max-w-[260px] flex-[0_0_18%] overflow-hidden md:block" aria-hidden="true">
-      <svg viewBox="0 0 200 820" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 size-full">
+    <div className="relative hidden max-w-[260px] flex-[0_0_18%] overflow-hidden lg:block" aria-hidden="true">
+      <svg viewBox="0 0 200 820" preserveAspectRatio="xMidYMax slice" className="absolute inset-0 size-full">
         <defs>
           <radialGradient id="art-glow">
             <stop offset="0" stopColor="var(--accent)" stopOpacity="0.26" />
             <stop offset="1" stopColor="var(--accent)" stopOpacity="0" />
           </radialGradient>
-          <linearGradient id="art-ink" x1="0" y1="1" x2="0" y2="0">
-            <stop offset="0" stopColor="#8a2a1c" />
-            <stop offset="0.45" stopColor="var(--accent)" />
-          </linearGradient>
           <linearGradient id="art-page-l" x1="1" x2="0">
             <stop offset="0" stopColor="var(--art-fold)" />
             <stop offset="0.22" stopColor="var(--surface)" />
@@ -73,154 +82,133 @@ export function InspirationArt() {
             <stop offset="0.5" stopColor="var(--surface)" />
             <stop offset="1" stopColor="var(--chip)" />
           </linearGradient>
-          <linearGradient id="art-leaf" x1="0" x2="1">
-            <stop offset="0" stopColor="var(--surface)" />
-            <stop offset="1" stopColor="var(--chip)" />
-          </linearGradient>
-          <radialGradient id="art-moon" cx="0.35" cy="0.4" r="0.8">
-            <stop offset="0" stopColor="var(--ink)" stopOpacity="0.75" />
-            <stop offset="1" stopColor="var(--ink)" />
-          </radialGradient>
           <radialGradient id="art-shadow">
             <stop offset="0" stopColor="#000" stopOpacity="0.28" />
             <stop offset="1" stopColor="#000" stopOpacity="0" />
           </radialGradient>
-          {/* Cada tramo se revela con un trazo que se dibuja sobre su máscara. */}
-          {STEM.map((segments, i) => (
-            <mask key={i} id={`art-reveal-${i}`} maskUnits="userSpaceOnUse">
-              <path d={pathOf(segments)} pathLength={1} fill="none" stroke="#fff" strokeWidth="14" strokeLinecap="round" className="art-draw" style={{ ...delay(0.3 + i * 0.75), ["--dur" as string]: "0.85s" }} />
-            </mask>
-          ))}
-          {(Object.keys(BRANCH) as (keyof typeof BRANCH)[]).map((k, i) => (
-            <mask key={k} id={`art-reveal-${k}`} maskUnits="userSpaceOnUse">
-              <path d={pathOf([BRANCH[k]])} pathLength={1} fill="none" stroke="#fff" strokeWidth="10" strokeLinecap="round" className="art-draw" style={{ ...delay(1 + i * 0.45), ["--dur" as string]: "0.6s" }} />
-            </mask>
-          ))}
+          {/* El sendero y la rama son punteados: se revelan dibujando su máscara. */}
+          <mask id="art-reveal-trail" maskUnits="userSpaceOnUse">
+            <path d={TRAIL_D} pathLength={1} fill="none" stroke="#fff" strokeWidth="12" strokeLinecap="round" className="art-draw" style={{ ...delay(DRAW_FROM), ["--dur" as string]: `${DRAW_FOR}s` }} />
+          </mask>
+          <mask id="art-reveal-unexplored" maskUnits="userSpaceOnUse">
+            <path d={pathOf(UNEXPLORED)} pathLength={1} fill="none" stroke="#fff" strokeWidth="10" strokeLinecap="round" className="art-draw" style={{ ...delay(passes(STOPS[2].fraction)), ["--dur" as string]: "1.1s" }} />
+          </mask>
         </defs>
 
         <rect width="200" height="820" className="fill-[#e6ddcf] dark:fill-[#1c1a18]" />
 
-        {/* Hojas apiladas como lomas, de lejos a cerca. */}
-        <g>
-          <path d="M0 560 C 40 540, 70 548, 100 536 C 135 522, 165 534, 200 520 L200 820 L0 820 Z" className="fill-[#d9cdb9] dark:fill-[#23201c]" />
-          <path d="M0 612 C 30 598, 62 606, 96 594 C 130 582, 168 598, 200 586 L200 820 L0 820 Z" className="fill-[#cbbda7] dark:fill-[#29251f]" />
-          <path d="M0 602 C 30 590, 62 598, 96 586 C 130 574, 168 590, 200 578" fill="none" strokeWidth="0.7" className="stroke-[#f4f0e8]/70 dark:stroke-[#39342c]" />
-          <path d="M0 668 C 36 654, 70 662, 104 652 C 140 642, 172 654, 200 646 L200 820 L0 820 Z" className="fill-[#b3a48d] dark:fill-[#2f2b25]" />
-        </g>
-
-        {/* Polvo de estrellas en lo alto. */}
-        <g className="art-pop" style={delay(3)}>
-          {(
-            [
-              [34, 70, 1.1, 0],
-              [70, 32, 0.8, -0.9],
-              [168, 58, 1.2, -1.6],
-              [186, 112, 0.7, -2.3],
-              [22, 150, 0.9, -0.5],
-              [58, 108, 0.6, -1.2],
-              [150, 22, 0.7, -2],
-            ] as const
-          ).map(([x, y, r, d]) => (
-            <circle key={`${x}-${y}`} cx={x} cy={y} r={r} className="art-twinkle fill-ink/45" style={delay(d)} />
+        {/* La cuadrícula del mapa, apenas. */}
+        <g fill="none" strokeWidth="0.5" strokeDasharray="1 4" className="art-fade stroke-ink/10" style={delay(0)}>
+          {[50, 100, 150].map((x) => (
+            <path key={x} d={`M${x} 0 V 820`} />
+          ))}
+          {[160, 360, 540].map((y) => (
+            <path key={y} d={`M0 ${y} H 200`} />
           ))}
         </g>
 
-        {/* La planta, en tres tramos de tallo con lo que sale de cada uno. */}
-        <g>
-          <Tapered segments={STEM[0]} widths={STEM_WIDTH[0]} mask="art-reveal-0" />
-          <Leaf at={[100, 636]} angle={-140} d={0.75} />
-          <Leaf at={[100, 636]} angle={-28} d={0.85} small />
-
-          <g>
-            <Tapered segments={STEM[1]} widths={STEM_WIDTH[1]} mask="art-reveal-1" />
-            <Tapered segments={[BRANCH.moon]} widths={[2, 0.7]} mask="art-reveal-moon" />
-            <Tapered segments={[BRANCH.music]} widths={[1.8, 0.7]} mask="art-reveal-music" />
-            <Leaf at={[118, 470]} angle={-158} d={1.5} small />
-            <Moon />
-            <Music />
-
-            <g>
-              <Tapered segments={STEM[2]} widths={STEM_WIDTH[2]} mask="art-reveal-2" />
-              <Tapered segments={[BRANCH.bird]} widths={[1.8, 0.7]} mask="art-reveal-bird" />
-              <Tapered segments={[BRANCH.stars]} widths={[1.5, 0.6]} mask="art-reveal-stars" />
-              <Leaf at={[128, 370]} angle={-24} d={2.2} />
-              <Bird />
-              <Stars />
-              <Sun />
-            </g>
-          </g>
+        {/* Curvas de nivel: la de adentro, más marcada. */}
+        <g fill="none" className="art-fade" style={delay(0.1)}>
+          {HILLS.map((h, j) =>
+            Array.from({ length: h.rings }, (_, i) => (
+              <path key={`${j}-${i}`} d={contour(h.c[0], h.c[1], h.r + i * 11, h.squash, j * 2 + i * 0.8)} strokeWidth={i === 0 ? 0.8 : 0.6} className={i === 0 ? "stroke-ink/25" : "stroke-ink/15"} />
+            )),
+          )}
+          <path d={`M${HILLS[1].c[0] - 3} ${HILLS[1].c[1] + 2} l 3 -5 3 5 z`} className="fill-ink/30" />
         </g>
 
-        {/* Letras que se escapan del libro. */}
-        <g className="fill-[#6b5f50] font-serif dark:fill-[#a39c90]">
-          {[
-            { c: "a", x: 66, s: 15, d: 0 },
-            { c: "ñ", x: 132, s: 13, d: -2.2 },
-            { c: "¿", x: 84, s: 12, d: -4.1, i: true },
-            { c: "r", x: 150, s: 11, d: -5.6 },
-            { c: "e", x: 40, s: 11, d: -1.3, i: true },
-            { c: "l", x: 116, s: 10, d: -3.4 },
-            { c: "s", x: 56, s: 9, d: -6.3, i: true },
-          ].map((l) => (
-            <text key={l.c} x={l.x} y={704} fontSize={l.s} fontStyle={l.i ? "italic" : undefined} className="art-rise" style={delay(l.d)}>
-              {l.c}
-            </text>
-          ))}
+        {/* El mar de abajo, en tres trazos de ola. */}
+        <g fill="none" strokeWidth="0.7" strokeLinecap="round" className="art-fade stroke-ink/30" style={delay(0.2)}>
+          <path d="M22 652 q 4 -3, 8 0 t 8 0 t 8 0" />
+          <path d="M32 662 q 4 -3, 8 0 t 8 0" />
+          <path d="M18 670 q 4 -3, 8 0 t 8 0 t 8 0 t 8 0" />
         </g>
+
+        {/* El sol detrás de la sierra: el destino. */}
+        <g className="art-pop" style={delay(passes(1) - 0.2)}>
+          <circle cx="124" cy="226" r="70" fill="url(#art-glow)" className="art-breathe" />
+          <circle cx="124" cy="226" r="36" className="fill-accent" />
+        </g>
+        <path d={`${RIDGE} L 200 290 L 0 290 Z`} className="fill-[#e6ddcf] dark:fill-[#1c1a18]" />
+        <path d={RIDGE} fill="none" strokeWidth="0.9" strokeLinejoin="round" className="stroke-ink/45" />
+
+        {/* Topónimos. */}
+        <g className="fill-ink/60 font-serif italic" fontSize="9">
+          <text x="24" y="686" className="art-fade" style={delay(2)}>
+            Mar de la nostalgia
+          </text>
+          <text x="150" y="488" textAnchor="middle" className="art-fade" style={delay(2.08)}>
+            Paso Beat
+          </text>
+          <text x="26" y="312" transform="rotate(-6 26 312)" className="art-fade" style={delay(2.16)}>
+            Tierra incógnita
+          </text>
+        </g>
+
+        <Compass />
+
+        {/* La rama sin explorar, en trazo cortado que avanza muy despacio. */}
+        <g mask="url(#art-reveal-unexplored)">
+          <path d={pathOf(UNEXPLORED)} fill="none" strokeWidth="1.1" strokeDasharray="3 3" strokeLinecap="round" className="art-march stroke-ink/45" />
+        </g>
+
+        {/* El sendero. */}
+        <g mask="url(#art-reveal-trail)">
+          <path d={TRAIL_D} fill="none" strokeWidth="2.4" strokeDasharray="0 5.5" strokeLinecap="round" className="stroke-accent" />
+        </g>
+
+        {STOPS.map((s, i) => (
+          <Stop key={i} at={s.at} lit={i < lit} appear={passes(s.fraction)} />
+        ))}
 
         <Book />
+
+        {/* El viajero: camina hasta la última parada encendida. */}
+        <g className="art-fade" style={delay(passes(0) + 0.2)}>
+          <circle r="4.2" strokeWidth="1.6" className="art-traveler fill-accent stroke-surface" style={{ offsetPath: `path("${TRAIL_D}")`, offsetDistance: `${travelled * 100}%` }} />
+        </g>
       </svg>
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Trazo de tinta con grosor variable                                  */
-/* ------------------------------------------------------------------ */
-
-function pathOf(segments: Cubic[]): string {
-  return segments.map(([a, b, c, d], i) => `${i ? "" : `M${a[0]} ${a[1]} `}C ${b[0]} ${b[1]}, ${c[0]} ${c[1]}, ${d[0]} ${d[1]}`).join(" ");
+/** Una parada: un lomo de libro parado junto al sendero, apagado hasta que llega una pista. */
+function Stop({ at: [x, y], lit, appear }: { at: Pt; lit: boolean; appear: number }) {
+  return (
+    <g transform={`translate(${x + 7} ${y})`} data-lit={lit || undefined} className="art-stop">
+      <g className="art-pop" style={delay(appear)}>
+        <rect x="-4.5" y="-15" width="9" height="14" rx="1.2" strokeWidth="0.8" className="fill-[#e6ddcf] stroke-ink/40 dark:fill-[#1c1a18]" />
+        <g className="art-stop-lit">
+          <rect x="-4.5" y="-15" width="9" height="14" rx="1.2" className="fill-ink" />
+          <rect x="-4.5" y="-11.5" width="9" height="2" className="fill-accent" />
+          <rect x="-2" y="-6" width="4" height="0.8" className="fill-bg/60" />
+        </g>
+      </g>
+    </g>
+  );
 }
 
-function cubicAt([a, b, c, d]: Cubic, t: number): { p: Pt; n: Pt } {
-  const u = 1 - t;
-  const p: Pt = [
-    u * u * u * a[0] + 3 * u * u * t * b[0] + 3 * u * t * t * c[0] + t * t * t * d[0],
-    u * u * u * a[1] + 3 * u * u * t * b[1] + 3 * u * t * t * c[1] + t * t * t * d[1],
-  ];
-  const dx = 3 * u * u * (b[0] - a[0]) + 6 * u * t * (c[0] - b[0]) + 3 * t * t * (d[0] - c[0]);
-  const dy = 3 * u * u * (b[1] - a[1]) + 6 * u * t * (c[1] - b[1]) + 3 * t * t * (d[1] - c[1]);
-  const len = Math.hypot(dx, dy) || 1;
-  return { p, n: [-dy / len, dx / len] };
+function Compass() {
+  return (
+    <g transform="translate(36 556)">
+      <g className="art-pop" style={delay(1)}>
+        <circle r="15" fill="none" strokeWidth="0.7" className="stroke-ink/35" />
+        <circle r="11.5" fill="none" strokeWidth="0.4" strokeDasharray="0.8 2.2" className="stroke-ink/35" />
+        <path d="M0 -15 V -12 M0 15 V 12 M-15 0 H -12 M15 0 H 12" strokeWidth="0.7" className="stroke-ink/45" />
+        <g className="art-needle" style={delay(1.3)}>
+          <path d="M0 -10 L 2.4 0 L 0 1.5 L -2.4 0 Z" className="fill-accent" />
+          <path d="M0 10 L 2.4 0 L 0 -1.5 L -2.4 0 Z" className="fill-ink/50" />
+        </g>
+        <circle r="1" className="fill-surface" />
+        <text y="-18" textAnchor="middle" fontSize="6.5" className="fill-ink/60 font-serif">
+          N
+        </text>
+      </g>
+    </g>
+  );
 }
 
-/** El contorno de un trazo que se afina de `w0` a `w1`, como una pincelada. */
-function taperedOutline(segments: Cubic[], [w0, w1]: [number, number]): string {
-  const steps = 18;
-  const left: Pt[] = [];
-  const right: Pt[] = [];
-  const total = segments.length * steps;
-  segments.forEach((seg, s) => {
-    for (let k = s === 0 ? 0 : 1; k <= steps; k++) {
-      const { p, n } = cubicAt(seg, k / steps);
-      const w = (w0 + (w1 - w0) * ((s * steps + k) / total)) / 2;
-      left.push([p[0] + n[0] * w, p[1] + n[1] * w]);
-      right.push([p[0] - n[0] * w, p[1] - n[1] * w]);
-    }
-  });
-  const r = (v: number) => v.toFixed(2);
-  const pts = [...left, ...right.reverse()];
-  return `M${pts.map(([x, y]) => `${r(x)} ${r(y)}`).join(" L")} Z`;
-}
-
-function Tapered({ segments, widths, mask }: { segments: Cubic[]; widths: [number, number]; mask: string }) {
-  return <path d={taperedOutline(segments, widths)} fill="url(#art-ink)" mask={`url(#${mask})`} />;
-}
-
-/* ------------------------------------------------------------------ */
-/* El libro                                                            */
-/* ------------------------------------------------------------------ */
-
+/** El libro abierto del que sale el sendero: el libro es el mapa. */
 function Book() {
   const left = "M100 712 C 82 700, 50 694, 14 700 L 11 758 C 46 751, 80 755, 100 768 Z";
   const right = "M100 712 C 118 700, 150 694, 186 700 L 189 758 C 154 751, 120 755, 100 768 Z";
@@ -250,146 +238,11 @@ function Book() {
           </g>
         );
       })}
-      {/* Una página a medio pasar, que se mueve con la brisa. */}
-      <g className="art-turn">
-        <path d="M100 713 C 112 694, 134 682, 160 682 C 162 702, 160 724, 154 744 C 134 742, 114 750, 100 767 Z" fill="url(#art-turn)" />
-        <path d="M160 682 C 162 702, 160 724, 154 744" fill="none" strokeWidth="0.5" className="stroke-ink/15" />
-      </g>
+      {/* Una página a medio pasar. */}
+      <path d="M100 713 C 112 694, 134 682, 160 682 C 162 702, 160 724, 154 744 C 134 742, 114 750, 100 767 Z" fill="url(#art-turn)" />
+      <path d="M160 682 C 162 702, 160 724, 154 744" fill="none" strokeWidth="0.5" className="stroke-ink/15" />
       {/* La sombra del pliegue. */}
       <path d="M100 712 L 100 768" strokeWidth="1.2" className="stroke-black/15" />
-    </g>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Hojas y escenas                                                     */
-/* ------------------------------------------------------------------ */
-
-function Leaf({ at: [x, y], angle, d, small = false }: { at: Pt; angle: number; d: number; small?: boolean }) {
-  return (
-    <g transform={`translate(${x} ${y}) rotate(${angle}) scale(${small ? 0.72 : 1})`}>
-      <g className="art-unfold" style={delay(d)}>
-        {/* Asimétrica y con la punta apenas curvada. */}
-        <path d="M0 0 C 5 -8, 15 -11, 27 -4 C 29 -3, 30 -1.5, 29 0 C 19 7, 7 6, 0 0 Z" fill="url(#art-leaf)" strokeWidth="0.5" className="stroke-ink/35" />
-        <path d="M1.5 0 C 9 -2.4, 18 -2.8, 27.5 -2" fill="none" strokeWidth="0.6" strokeLinecap="round" className="stroke-accent/70" />
-        <path d="M10 -1.4 l 4 -4.4 M17 -1.9 l 3.6 -3.6 M12 -1.2 l 3 3.4" fill="none" strokeWidth="0.35" className="stroke-accent/45" />
-      </g>
-    </g>
-  );
-}
-
-function Blossom({ x, y, d, children }: { x: number; y: number; d: number; children: ReactNode }) {
-  return (
-    <g className="art-pop" style={delay(d)}>
-      <circle cx={x} cy={y} r="22" fill="url(#art-glow)" className="art-breathe" />
-      {children}
-    </g>
-  );
-}
-
-/** Una chispa de cuatro puntas. */
-function Sparkle({ x, y, r, d, className = "fill-ink" }: { x: number; y: number; r: number; d: number; className?: string }) {
-  const k = r * 0.22;
-  return (
-    <path
-      d={`M${x} ${y - r} Q ${x + k} ${y - k}, ${x + r} ${y} Q ${x + k} ${y + k}, ${x} ${y + r} Q ${x - k} ${y + k}, ${x - r} ${y} Q ${x - k} ${y - k}, ${x} ${y - r} Z`}
-      className={`art-twinkle ${className}`}
-      style={delay(d)}
-    />
-  );
-}
-
-function Moon() {
-  return (
-    <Blossom x={50} y={478} d={1.6}>
-      <path d="M56 465 a13.5 13.5 0 1 0 0 26 a10.5 10.5 0 1 1 0 -26 z" fill="url(#art-moon)" />
-      {/* Una nube fina que pasa. */}
-      <path d="M30 486 C 36 482, 42 486, 46 483 C 50 480, 56 484, 60 482" fill="none" strokeWidth="0.7" strokeLinecap="round" className="art-drift stroke-ink/40" />
-      <Sparkle x={33} y={464} r={3} d={0} />
-      <Sparkle x={66} y={496} r={2.2} d={-1.1} />
-    </Blossom>
-  );
-}
-
-function Music() {
-  return (
-    <Blossom x={170} y={448} d={1.9}>
-      {/* Un pentagrama que se curva como una cinta. */}
-      <g fill="none" strokeWidth="0.45" className="stroke-ink/55">
-        {[0, 2.2, 4.4, 6.6, 8.8].map((o) => (
-          <path key={o} d={`M156 ${445 + o} C 166 ${439 + o}, 176 ${446 + o}, 190 ${436 + o}`} />
-        ))}
-      </g>
-      {/* Dos corcheas unidas por su barra. */}
-      <g className="fill-ink stroke-ink">
-        <ellipse cx="167" cy="449" rx="2.3" ry="1.6" transform="rotate(-24 167 449)" stroke="none" />
-        <ellipse cx="177" cy="446" rx="2.3" ry="1.6" transform="rotate(-24 177 446)" stroke="none" />
-        <path d="M169 448.4 V 438 M179 445.4 V 435 M169 438 L 179 435 L 179 437.2 L 169 440.2 Z" strokeWidth="0.8" />
-      </g>
-      <g className="art-note" style={delay(0)}>
-        <SingleNote x={184} y={434} />
-      </g>
-      <g className="art-note" style={delay(-1.8)}>
-        <SingleNote x={174} y={430} small />
-      </g>
-    </Blossom>
-  );
-}
-
-function SingleNote({ x, y, small = false }: { x: number; y: number; small?: boolean }) {
-  return (
-    <g transform={`translate(${x} ${y}) scale(${small ? 0.75 : 1})`}>
-      <ellipse rx="2.2" ry="1.5" transform="rotate(-24)" className="fill-ink" />
-      <path d="M2 -0.6 V -9 C 3.6 -7.6, 5.4 -7, 5.6 -4.8" fill="none" strokeWidth="0.8" strokeLinecap="round" className="stroke-ink" />
-    </g>
-  );
-}
-
-/** Un pájaro de papel posado en su rama, que bate las alas. */
-function Bird() {
-  return (
-    <Blossom x={62} y={340} d={2.3}>
-      <g transform="translate(62 342)">
-        <path d="M-14 -2 L 2 -1 L 12 -6 L 6 2 L -6 4 Z" className="fill-surface stroke-ink/60" strokeWidth="0.5" strokeLinejoin="round" />
-        <path d="M2 -1 L 6 2 L -6 4 Z" className="fill-[#e3d9c8] dark:fill-[#3a352e]" />
-        <path d="M12 -6 L 16 -5 L 12.5 -4.4 Z" className="fill-ink" />
-        {/* Las alas: un pliegue que sube y baja. */}
-        <g className="art-flap">
-          <path d="M-4 -1.5 L 4 -1.5 L -8 -16 Z" className="fill-surface stroke-ink/60" strokeWidth="0.5" strokeLinejoin="round" />
-          <path d="M-4 -1.5 L 0 -1.5 L -8 -16 Z" className="fill-[#e3d9c8] dark:fill-[#3a352e]" />
-        </g>
-        <path d="M-14 -2 L -20 -8 L -12 -0.5 Z" className="fill-accent" />
-      </g>
-    </Blossom>
-  );
-}
-
-function Stars() {
-  const points: [number, number, number][] = [
-    [164, 262, 2.6],
-    [174, 249, 4.2],
-    [186, 256, 2.4],
-    [182, 236, 3],
-  ];
-  return (
-    <Blossom x={176} y={250} d={2.6}>
-      <polyline points={points.map(([x, y]) => `${x},${y}`).join(" ")} fill="none" strokeWidth="0.4" strokeDasharray="1 1.6" className="stroke-ink/50" />
-      {points.map(([x, y, r], i) => (
-        <Sparkle key={i} x={x} y={y} r={r} d={-i * 0.65} />
-      ))}
-    </Blossom>
-  );
-}
-
-function Sun() {
-  return (
-    <g className="art-pop" style={delay(2.8)}>
-      <circle cx="126" cy="182" r="76" fill="url(#art-glow)" className="art-breathe" />
-      <g className="animate-orbit" style={{ transformOrigin: "126px 182px" }}>
-        <circle cx="126" cy="182" r="56" fill="none" strokeWidth="0.9" strokeDasharray="1.5 5.5" className="stroke-accent/50" />
-        <circle cx="126" cy="126" r="2" className="fill-accent" />
-      </g>
-      <circle cx="126" cy="182" r="40" className="fill-accent" />
     </g>
   );
 }
