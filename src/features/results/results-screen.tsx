@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { BookCover } from "@/components/book-cover";
 import { ArrowLeftIcon, ArrowRightIcon, PenIcon } from "@/components/icons";
 import { SiteHeader } from "@/components/site-header";
@@ -9,10 +9,10 @@ import { VoteControl } from "@/components/vote-control";
 import { LANE_META, LANE_ORDER } from "@/lib/graph/labels";
 import { recommendedBook } from "@/lib/graph/merge";
 import type { Lane } from "@/lib/graph/schema";
-import { bookSnapshot, useLineas, type LaneState } from "@/lib/store";
+import { bookSnapshot, useLineas, type LaneState, type OptionSource } from "@/lib/store";
 import { NoClues } from "@/components/no-clues";
 import { authorHref } from "@/lib/authors/link";
-import { LaneSearch } from "./lane-search";
+import { LaneDrift } from "./lane-drift";
 import { LibraryNotice } from "@/features/library/library-notice";
 
 export function ResultsScreen() {
@@ -22,6 +22,7 @@ export function ResultsScreen() {
   const error = useLineas((s) => s.error);
   const errorNeedsEdit = useLineas((s) => s.errorNeedsEdit);
   const search = useLineas((s) => s.search);
+  const engine = useLineas((s) => s.engine);
 
   // Si se entra directo a /resultados (o cambiaron las pistas), buscar.
   useEffect(() => {
@@ -73,6 +74,13 @@ export function ResultsScreen() {
             Editar pistas
           </Link>
         </div>
+
+        {engine === "mock" && status !== "error" && (
+          <p role="status" className="mt-6 rounded-xl border border-line bg-surface px-4 py-3 text-[13px] leading-relaxed">
+            Estás viendo resultados de ejemplo: la IA no está activa y las recomendaciones son siempre las mismas.
+            {process.env.NODE_ENV === "development" && <span className="text-muted"> Sacá LINEAS_ENGINE=mock del entorno y reiniciá el servidor.</span>}
+          </p>
+        )}
 
         {status === "error" && (
           <div role="alert" className="mt-9 rounded-2xl border border-line bg-surface p-6">
@@ -156,15 +164,48 @@ function LaneDot({ state }: { state: LaneState }) {
   );
 }
 
-const WAITING_COPY: Record<Lane, () => string> = {
-  affinity: () => "Primero, lo que está a un paso de tus pistas.",
-  alternative: () => "Probando otra puerta: otra época, otra lengua.",
-  beyond: () => "Buscando un puente que no esperabas.",
+const WAITING_COPY: Record<Lane, string> = {
+  affinity: "Primero, lo que está a un paso de tus pistas.",
+  alternative: "Probando otra puerta: otra época, otra lengua.",
+  beyond: "Buscando un puente que no esperabas.",
 };
+/** Si la espera se alarga, el texto lo dice: primero qué se está haciendo, después que los otros caminos no dependen de este. */
+/** Al pedir otra en un carril que ya mostró un libro. */
+const AGAIN_COPY = "Buscando otro libro para este camino.";
+const LATE_COPY = ["Todavía buscando. Revisamos que el libro exista en los catálogos.", "Este camino tarda más de lo normal. Los otros siguen por su cuenta."];
+const LATE_AFTER = [9000, 22000];
+
+/**
+ * waiting: la búsqueda. landing: llegó el libro y el trazo va al hueco.
+ * revealing: la tapa aparece en el hueco mientras la búsqueda se apaga.
+ * shown: la card sola. Si al montar ya había libro, se muestra sin llegada.
+ */
+type Phase = "waiting" | "landing" | "revealing" | "shown";
+const REVEAL_MS = 260;
 
 function LaneSlot({ lane, state }: { lane: Lane; state: LaneState }) {
   const meta = LANE_META[lane];
   const graph = state.options[state.index];
+  // Se espera un libro en la primera búsqueda y también al pedir otro: el viento vuelve hasta que llega el nuevo.
+  const [base, setBase] = useState(state.options.length);
+  const again = state.loadingMore && state.options.length === base;
+  const awaiting = state.status === "pending" || again;
+  const [phase, setPhase] = useState<Phase>(awaiting ? "waiting" : "shown");
+  const [wasAwaiting, setWasAwaiting] = useState(awaiting);
+  if (awaiting !== wasAwaiting) {
+    setWasAwaiting(awaiting);
+    // Aterriza solo si llegó un libro; si «ver otra» no encontró nada, vuelve la card de antes.
+    setPhase(awaiting ? "waiting" : state.status === "ready" && state.options.length > base ? "landing" : "shown");
+  }
+  if (!state.loadingMore && base !== state.options.length) setBase(state.options.length);
+  useEffect(() => {
+    if (phase !== "revealing") return;
+    const id = window.setTimeout(() => setPhase("shown"), REVEAL_MS);
+    return () => window.clearTimeout(id);
+  }, [phase]);
+
+  const searching = phase !== "shown" && state.status !== "error";
+  const showCard = state.status === "ready" && !!graph && (phase === "revealing" || phase === "shown");
 
   return (
     <article
@@ -183,21 +224,80 @@ function LaneSlot({ lane, state }: { lane: Lane; state: LaneState }) {
       </div>
       <p className="mt-1.5 text-xs leading-snug text-muted">{meta.hint}</p>
 
-      {state.status === "pending" && <Waiting lane={lane} />}
       {state.status === "error" && <LaneError lane={lane} message={state.error} />}
-      {state.status === "ready" && graph && <LaneCard lane={lane} state={state} />}
+      {/* La búsqueda y la card comparten lugar: durante la llegada se cruzan. */}
+      <div className="grid flex-1 *:[grid-area:1/1]">
+        {searching && (
+          <Waiting lane={lane} again={base > 0} landing={phase !== "waiting"} leaving={phase === "revealing"} onLanded={() => setPhase("revealing")} />
+        )}
+        {showCard && <LaneCard lane={lane} state={state} entrance={phase === "revealing" ? "arrive" : "none"} />}
+      </div>
     </article>
   );
 }
 
-function Waiting({ lane }: { lane: Lane }) {
+function Waiting({ lane, again, landing, leaving, onLanded }: { lane: Lane; again: boolean; landing: boolean; leaving: boolean; onLanded: () => void }) {
+  const [late, setLate] = useState(0);
+  useEffect(() => {
+    const ids = LATE_AFTER.map((ms, i) => window.setTimeout(() => setLate(i + 1), ms));
+    return () => ids.forEach((id) => window.clearTimeout(id));
+  }, []);
+  const copy = late === 0 ? (again ? AGAIN_COPY : WAITING_COPY[lane]) : LATE_COPY[late - 1];
+
   return (
-    <div className="flex flex-1 flex-col" role="status">
-      <LaneSearch lane={lane} />
-      <p className="mt-2 font-serif text-[16px] leading-snug">{WAITING_COPY[lane]()}</p>
+    // Al pedir otra, el viento entra con un fundido: reemplaza a la card que estaba.
+    <div className={`flex h-full flex-col ${leaving ? "leave" : again ? "animate-fade" : ""}`} role="status" aria-hidden={leaving || undefined}>
+      {/* Mismo alto y margen que el bloque de la tapa: el viento se condensa donde va a estar el libro. */}
+      <div className="mt-4.5">
+        <LaneDrift lane={lane} landing={landing} onLanded={onLanded} />
+      </div>
+      {/* El mensaje ocupa el lugar del título; el resto es la card en esqueleto, con sus mismas medidas. */}
+      <p key={late} className="animate-fade font-serif text-[19px] leading-snug text-muted italic">
+        {copy}
+      </p>
+      <CardSkeleton />
     </div>
   );
 }
+
+/** Cada parte de la card con su alto y su margen, para que al llegar el libro nada salte. */
+function CardSkeleton() {
+  return (
+    <div className="flex flex-1 flex-col" aria-hidden="true">
+      <Line className="mt-1 h-[19.5px] w-2/5" />
+      <div className="mt-3.5">
+        {["w-full", "w-11/12", "w-4/5"].map((w, i) => (
+          <Line key={i} className={`h-[22.75px] md:h-[19.5px] ${w}`} />
+        ))}
+      </div>
+      <Line className="mt-2.5 h-4 w-1/4" thin />
+      <div className="mt-3 flex items-center gap-1.5">
+        <Line className="mr-1 h-7 w-14" thin />
+        <span className="h-7 w-9 rounded-full border border-line" />
+        <span className="h-7 w-9 rounded-full border border-line" />
+      </div>
+      <div className="min-h-5 flex-1" />
+      <div className="mt-4 flex gap-2">
+        <span className="h-10.5 flex-1 rounded-full bg-chip" />
+        <span className="h-10.5 flex-1 rounded-full border border-line" />
+      </div>
+      <Line className="mx-auto mt-1.5 h-10 w-36" thin />
+      <Line className="mx-auto mt-1 h-[16.5px] w-44" thin />
+    </div>
+  );
+}
+
+/** Una línea de texto en esqueleto: la barra centrada en el alto de la línea real. */
+function Line({ className, thin = false }: { className: string; thin?: boolean }) {
+  return (
+    <div className={`flex items-center ${className}`}>
+      <div className={`w-full rounded-full bg-chip ${thin ? "h-1.5" : "h-2"}`} />
+    </div>
+  );
+}
+
+/** Retraso y desplazamiento de cada parte de la card al llegar. */
+const beat = (delay: number, rise: number, dur = 300) => ({ "--delay": `${delay}ms`, "--rise": `${rise}px`, "--dur": `${dur}ms` }) as CSSProperties;
 
 function LaneError({ lane, message }: { lane: Lane; message: string | null }) {
   const retryLane = useLineas((s) => s.retryLane);
@@ -215,7 +315,7 @@ function LaneError({ lane, message }: { lane: Lane; message: string | null }) {
   );
 }
 
-function LaneCard({ lane, state }: { lane: Lane; state: LaneState }) {
+function LaneCard({ lane, state, entrance }: { lane: Lane; state: LaneState; entrance: "arrive" | "none" }) {
   const library = useLineas((s) => s.library);
   const toggleLibrary = useLineas((s) => s.toggleLibrary);
   const setFocus = useLineas((s) => s.setFocus);
@@ -226,21 +326,31 @@ function LaneCard({ lane, state }: { lane: Lane; state: LaneState }) {
   const graph = state.options[state.index];
   const rec = graph.recommendations[0];
   const node = recommendedBook(graph);
+  // Lo que valía al montar: si cambia a mitad de la llegada, la animación no se corta.
+  const [firstId] = useState(node?.id);
+  const [arrivedFromSearch] = useState(entrance === "arrive");
   if (!rec || !node) return null;
+  // Llega con coreografía al salir de la búsqueda, y también al pedir otra.
+  const arrive = arrivedFromSearch || node.id !== firstId;
+  const cls = (name: string) => (arrive ? name : "");
   const isSaved = !!library[node.id]?.statuses.saved;
   const isRead = !!library[node.id]?.statuses.read;
   const author = node.book?.author ?? node.subtitle ?? "";
 
   return (
-    <div key={node.id} className="animate-fade flex flex-1 flex-col">
+    <div key={node.id} className="flex flex-1 flex-col">
       <div className={`mt-4.5 flex gap-4 transition-opacity md:flex-col md:gap-0 ${state.loadingMore ? "opacity-40" : ""}`}>
-        <div className="md:hidden">
+        <div className={`md:hidden ${cls("arrive-cover")}`}>
           <BookCover id={node.id} title={node.label} author={author} size="md" coverUrl={node.book?.coverUrl} />
         </div>
-        <Link href={`/libro/${node.id}`} tabIndex={-1} aria-hidden="true" className="mx-auto mt-5.5 mb-5 hidden transition-transform hover:-translate-y-0.5 md:block">
+        <Link
+          href={`/libro/${node.id}`}
+          tabIndex={-1}
+          aria-hidden="true"
+          className={`mx-auto mt-5.5 mb-5 hidden transition-transform hover:-translate-y-0.5 md:block ${cls("arrive-cover")}`}>
           <BookCover id={node.id} title={node.label} author={author} size="lg" coverUrl={node.book?.coverUrl} />
         </Link>
-        <div className="min-w-0 pt-1 md:pt-0">
+        <div className={`min-w-0 pt-1 md:pt-0 ${cls("arrive")}`} style={beat(70, 6)}>
           <h2 className="font-serif text-[22px] leading-[1.15] md:text-[23px]">
             <Link href={`/libro/${node.id}`} className="hover:underline">
               {node.label}
@@ -263,17 +373,19 @@ function LaneCard({ lane, state }: { lane: Lane; state: LaneState }) {
           )}
         </div>
       </div>
-      <p className={`mt-3.5 text-sm leading-relaxed md:text-[13px] md:leading-normal ${state.loadingMore ? "opacity-40" : ""}`}>{rec.pitch}</p>
-      <Link
-        href="/conexiones"
-        onClick={() => setFocus(node.id)}
-        className="mt-2.5 self-start text-xs text-muted underline underline-offset-[3px] hover:text-ink">
-        ¿Cómo llegamos acá?
-      </Link>
-      <VoteControl question="¿Te sirve?" value={recVotes[node.id]} onVote={(v) => void voteRecommendation(lane, v)} className="mt-3" />
+      <div className={`flex flex-col ${cls("arrive")}`} style={beat(120, 4, 280)}>
+        <p className={`mt-3.5 text-sm leading-relaxed md:text-[13px] md:leading-normal ${state.loadingMore ? "opacity-40" : ""}`}>{rec.pitch}</p>
+        <Link
+          href="/conexiones"
+          onClick={() => setFocus(node.id)}
+          className="mt-2.5 self-start text-xs text-muted underline underline-offset-[3px] hover:text-ink">
+          ¿Cómo llegamos acá?
+        </Link>
+        <VoteControl question="¿Te sirve?" value={recVotes[node.id]} onVote={(v) => void voteRecommendation(lane, v)} className="mt-3" />
+      </div>
 
       <div className="min-h-5 flex-1" />
-      <div className="mt-4 flex gap-2">
+      <div className={`mt-4 flex gap-2 ${cls("arrive")}`} style={beat(170, 0, 240)}>
         <button
           type="button"
           aria-pressed={isSaved}
@@ -302,8 +414,22 @@ function LaneCard({ lane, state }: { lane: Lane; state: LaneState }) {
           {state.error}
         </p>
       )}
+      <SourceNote source={state.sources[state.index]} />
     </div>
   );
+}
+
+/** De dónde salió el libro que se ve: así se nota si la IA respondió, si vino del cache o si es el ejemplo fijo. */
+function SourceNote({ source }: { source: OptionSource | undefined }) {
+  const engine = useLineas((s) => s.engine);
+  if (!source) return null;
+  const text =
+    engine === "mock"
+      ? "Ejemplo fijo, sin IA."
+      : source.cached
+        ? "Guardado de una búsqueda anterior con estas pistas."
+        : `Respuesta de la IA en ${(source.ms / 1000).toLocaleString("es-AR", { maximumFractionDigits: 1 })} s.`;
+  return <p className="mt-1 text-center text-[11px] text-muted">{text}</p>;
 }
 
 function joinLabels(labels: string[]): string {
