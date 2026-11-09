@@ -170,6 +170,8 @@ const WAITING_COPY: Record<Lane, string> = {
   beyond: "Buscando un puente que no esperabas.",
 };
 /** Si la espera se alarga, el texto lo dice: primero qué se está haciendo, después que los otros caminos no dependen de este. */
+/** Al pedir otra en un carril que ya mostró un libro. */
+const AGAIN_COPY = "Buscando otro libro para este camino.";
 const LATE_COPY = ["Todavía buscando. Revisamos que el libro exista en los catálogos.", "Este camino tarda más de lo normal. Los otros siguen por su cuenta."];
 const LATE_AFTER = [9000, 22000];
 
@@ -184,12 +186,18 @@ const REVEAL_MS = 260;
 function LaneSlot({ lane, state }: { lane: Lane; state: LaneState }) {
   const meta = LANE_META[lane];
   const graph = state.options[state.index];
-  const [phase, setPhase] = useState<Phase>(state.status === "pending" ? "waiting" : "shown");
-  const [seen, setSeen] = useState(state.status);
-  if (state.status !== seen) {
-    setSeen(state.status);
-    setPhase(state.status === "pending" ? "waiting" : state.status === "ready" && seen === "pending" ? "landing" : "shown");
+  // Se espera un libro en la primera búsqueda y también al pedir otro: el viento vuelve hasta que llega el nuevo.
+  const [base, setBase] = useState(state.options.length);
+  const again = state.loadingMore && state.options.length === base;
+  const awaiting = state.status === "pending" || again;
+  const [phase, setPhase] = useState<Phase>(awaiting ? "waiting" : "shown");
+  const [wasAwaiting, setWasAwaiting] = useState(awaiting);
+  if (awaiting !== wasAwaiting) {
+    setWasAwaiting(awaiting);
+    // Aterriza solo si llegó un libro; si «ver otra» no encontró nada, vuelve la card de antes.
+    setPhase(awaiting ? "waiting" : state.status === "ready" && state.options.length > base ? "landing" : "shown");
   }
+  if (!state.loadingMore && base !== state.options.length) setBase(state.options.length);
   useEffect(() => {
     if (phase !== "revealing") return;
     const id = window.setTimeout(() => setPhase("shown"), REVEAL_MS);
@@ -219,23 +227,26 @@ function LaneSlot({ lane, state }: { lane: Lane; state: LaneState }) {
       {state.status === "error" && <LaneError lane={lane} message={state.error} />}
       {/* La búsqueda y la card comparten lugar: durante la llegada se cruzan. */}
       <div className="grid flex-1 *:[grid-area:1/1]">
-        {searching && <Waiting lane={lane} landing={phase !== "waiting"} leaving={phase === "revealing"} onLanded={() => setPhase("revealing")} />}
+        {searching && (
+          <Waiting lane={lane} again={base > 0} landing={phase !== "waiting"} leaving={phase === "revealing"} onLanded={() => setPhase("revealing")} />
+        )}
         {showCard && <LaneCard lane={lane} state={state} entrance={phase === "revealing" ? "arrive" : "none"} />}
       </div>
     </article>
   );
 }
 
-function Waiting({ lane, landing, leaving, onLanded }: { lane: Lane; landing: boolean; leaving: boolean; onLanded: () => void }) {
+function Waiting({ lane, again, landing, leaving, onLanded }: { lane: Lane; again: boolean; landing: boolean; leaving: boolean; onLanded: () => void }) {
   const [late, setLate] = useState(0);
   useEffect(() => {
     const ids = LATE_AFTER.map((ms, i) => window.setTimeout(() => setLate(i + 1), ms));
     return () => ids.forEach((id) => window.clearTimeout(id));
   }, []);
-  const copy = late === 0 ? WAITING_COPY[lane] : LATE_COPY[late - 1];
+  const copy = late === 0 ? (again ? AGAIN_COPY : WAITING_COPY[lane]) : LATE_COPY[late - 1];
 
   return (
-    <div className={`flex flex-col ${leaving ? "leave" : ""}`} role="status" aria-hidden={leaving || undefined}>
+    // Al pedir otra, el viento entra con un fundido: reemplaza a la card que estaba.
+    <div className={`flex flex-col ${leaving ? "leave" : again ? "animate-fade" : ""}`} role="status" aria-hidden={leaving || undefined}>
       {/* Mismo alto y margen que el bloque de la tapa: el viento se condensa donde va a estar el libro. */}
       <div className="mt-4.5">
         <LaneDrift lane={lane} landing={landing} onLanded={onLanded} />
