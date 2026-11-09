@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FIELD, ORIGIN, SLOT, landingPoint, planSearch } from "./search-plan";
+import { FIELD, ORIGIN, SLOT, planLanding, planSearch } from "./search-plan";
 
 describe("planSearch", () => {
   it("es determinista por semilla y cambia entre ciclos", () => {
@@ -7,17 +7,13 @@ describe("planSearch", () => {
     expect(planSearch("affinity", 1).candidates).not.toEqual(planSearch("affinity", 2).candidates);
   });
 
-  it("sigue el guion de cada carril y termina siempre en el libro", () => {
-    expect(planSearch("affinity", 3).steps.map((s) => s.kind)).toEqual(["reject", "reject", "land"]);
-    expect(planSearch("alternative", 3).steps.map((s) => s.kind)).toEqual(["reject", "hop", "reject", "land"]);
-    expect(planSearch("beyond", 3).steps.map((s) => s.kind)).toEqual(["reject", "reject", "hop", "land"]);
+  it("sigue el guion de cada carril y, mientras espera, nunca llega", () => {
+    expect(planSearch("affinity", 3).steps.map((s) => s.kind)).toEqual(["reject", "reject", "reject"]);
+    expect(planSearch("alternative", 3).steps.map((s) => s.kind)).toEqual(["reject", "hop", "reject", "reject"]);
+    expect(planSearch("beyond", 3).steps.map((s) => s.kind)).toEqual(["reject", "reject", "hop", "reject"]);
     for (const lane of ["affinity", "alternative", "beyond"] as const) {
       for (let seed = 0; seed < 10; seed++) {
-        // La llegada termina sobre el borde del lugar del libro.
-        const [x, y] = planSearch(lane, seed).steps.at(-1)!.d.split(" ").slice(-2).map(Number);
-        const onTop = y === SLOT.y && x >= SLOT.x && x <= SLOT.x + SLOT.w;
-        const onSide = (x === SLOT.x || x === SLOT.x + SLOT.w) && y >= SLOT.y && y <= SLOT.y + SLOT.h;
-        expect(onTop || onSide).toBe(true);
+        for (const step of planSearch(lane, seed).steps) expect(step.target).toBeGreaterThanOrEqual(0);
       }
     }
   });
@@ -26,7 +22,24 @@ describe("planSearch", () => {
     for (let seed = 0; seed < 20; seed++) {
       for (const p of planSearch("alternative", seed).candidates) {
         expect(Math.hypot(p.x - ORIGIN.x, p.y - ORIGIN.y)).toBeGreaterThanOrEqual(26);
-        expect(p.x > SLOT.x - 10 && p.x < SLOT.x + SLOT.w + 10 && p.y > SLOT.y - 14).toBe(false);
+        expect(p.x > SLOT.x - 12 && p.x < SLOT.x + SLOT.w + 12 && p.y > SLOT.y - 12).toBe(false);
+        expect(p.x).toBeGreaterThanOrEqual(0);
+        expect(p.x).toBeLessThanOrEqual(FIELD.width);
+      }
+    }
+  });
+
+  it("lo que cruza de un costado al otro rodea el hueco por arriba", () => {
+    for (let seed = 0; seed < 20; seed++) {
+      for (const lane of ["affinity", "alternative", "beyond"] as const) {
+        for (const step of planSearch(lane, seed).steps) {
+          const nums = step.d.replace(/[MQC,]/g, " ").trim().split(/\s+/).map(Number);
+          const [ax, , ...rest] = nums;
+          const bx = rest[rest.length - 2];
+          const crosses = (ax < SLOT.x && bx > SLOT.x + SLOT.w) || (bx < SLOT.x && ax > SLOT.x + SLOT.w);
+          if (crosses) expect(step.d).toContain("C");
+          if (crosses) expect(Math.max(...[nums[3], nums[5]])).toBeLessThan(SLOT.y);
+        }
       }
     }
   });
@@ -47,12 +60,15 @@ describe("planSearch", () => {
       expect(step.erase[0]).toBeGreaterThanOrEqual(step.hold[1]);
     }
     expect(plan.total).toBeGreaterThan(Math.max(...plan.steps.map((s) => s.erase[1])));
-    expect(plan.land).toBe(plan.steps.at(-1)!.draw[1]);
   });
+});
 
-  it("entra por arriba si viene de arriba y por el costado si viene de abajo", () => {
-    expect(landingPoint({ x: 30, y: 40 }).point).toEqual({ x: SLOT.x + SLOT.w / 2, y: SLOT.y });
-    expect(landingPoint({ x: 30, y: 160 }).point).toEqual({ x: SLOT.x, y: 160 });
-    expect(landingPoint({ x: 180, y: 150 }).point).toEqual({ x: SLOT.x + SLOT.w, y: 150 });
+describe("planLanding", () => {
+  it("sale de las pistas y entra al lugar del libro por el centro de arriba", () => {
+    const { d, end } = planLanding();
+    expect(d.startsWith(`M${ORIGIN.x} ${ORIGIN.y}`)).toBe(true);
+    const [x, y] = d.split(" ").slice(-2).map(Number);
+    expect({ x, y }).toEqual(end);
+    expect(end).toEqual({ x: SLOT.x + SLOT.w / 2, y: SLOT.y });
   });
 });
