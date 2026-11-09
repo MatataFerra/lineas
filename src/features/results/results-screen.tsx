@@ -246,19 +246,52 @@ function Waiting({ lane, again, landing, leaving, onLanded }: { lane: Lane; agai
 
   return (
     // Al pedir otra, el viento entra con un fundido: reemplaza a la card que estaba.
-    <div className={`flex flex-col ${leaving ? "leave" : again ? "animate-fade" : ""}`} role="status" aria-hidden={leaving || undefined}>
+    <div className={`flex h-full flex-col ${leaving ? "leave" : again ? "animate-fade" : ""}`} role="status" aria-hidden={leaving || undefined}>
       {/* Mismo alto y margen que el bloque de la tapa: el viento se condensa donde va a estar el libro. */}
       <div className="mt-4.5">
         <LaneDrift lane={lane} landing={landing} onLanded={onLanded} />
       </div>
+      {/* El mensaje ocupa el lugar del título; el resto es la card en esqueleto, con sus mismas medidas. */}
       <p key={late} className="animate-fade font-serif text-[19px] leading-snug text-muted italic">
         {copy}
       </p>
-      <div className="mt-4 space-y-2" aria-hidden="true">
-        {["w-11/12", "w-4/5", "w-3/5"].map((w) => (
-          <div key={w} className={`h-2 rounded-full bg-chip ${w}`} />
+      <CardSkeleton />
+    </div>
+  );
+}
+
+/** Cada parte de la card con su alto y su margen, para que al llegar el libro nada salte. */
+function CardSkeleton() {
+  return (
+    <div className="flex flex-1 flex-col" aria-hidden="true">
+      <Line className="mt-1 h-[19.5px] w-2/5" />
+      <div className="mt-3.5">
+        {["w-full", "w-11/12", "w-4/5"].map((w, i) => (
+          <Line key={i} className={`h-[22.75px] md:h-[19.5px] ${w}`} />
         ))}
       </div>
+      <Line className="mt-2.5 h-4 w-1/4" thin />
+      <div className="mt-3 flex items-center gap-1.5">
+        <Line className="mr-1 h-7 w-14" thin />
+        <span className="h-7 w-9 rounded-full border border-line" />
+        <span className="h-7 w-9 rounded-full border border-line" />
+      </div>
+      <div className="min-h-5 flex-1" />
+      <div className="mt-4 flex gap-2">
+        <span className="h-10.5 flex-1 rounded-full bg-chip" />
+        <span className="h-10.5 flex-1 rounded-full border border-line" />
+      </div>
+      <Line className="mx-auto mt-1.5 h-10 w-36" thin />
+      <Line className="mx-auto mt-1 h-[16.5px] w-44" thin />
+    </div>
+  );
+}
+
+/** Una línea de texto en esqueleto: la barra centrada en el alto de la línea real. */
+function Line({ className, thin = false }: { className: string; thin?: boolean }) {
+  return (
+    <div className={`flex items-center ${className}`}>
+      <div className={`w-full rounded-full bg-chip ${thin ? "h-1.5" : "h-2"}`} />
     </div>
   );
 }
