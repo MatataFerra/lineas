@@ -20,9 +20,20 @@ export interface LaneState {
   /** Se está pidiendo otra opción para este carril. */
   loadingMore: boolean;
   error: string | null;
+  /** De dónde salió cada opción, en el mismo orden que `options`. */
+  sources: OptionSource[];
 }
 
-const emptyLane = (): LaneState => ({ status: "pending", options: [], index: 0, loadingMore: false, error: null });
+/** El origen de una opción: si la armó el motor recién o vino del cache, y cuánto tardó. */
+export interface OptionSource {
+  cached: boolean;
+  ms: number;
+}
+
+/** Qué motor respondió la última búsqueda: "mock" es el grafo de ejemplo, sin IA. */
+export type EngineName = "mock" | "openrouter" | "deepseek";
+
+const emptyLane = (): LaneState => ({ status: "pending", options: [], index: 0, loadingMore: false, error: null, sources: [] });
 const emptyLanes = (): Record<Lane, LaneState> => ({ affinity: emptyLane(), alternative: emptyLane(), beyond: emptyLane() });
 
 export interface SessionUser {
@@ -68,6 +79,8 @@ interface LineasState {
   graphKey: string | null;
   /** Libro (id de nodo) cuyo recorrido se muestra en el mapa. */
   focus: string | null;
+  /** El motor que respondió (cabecera x-lineas-engine); null hasta la primera respuesta. */
+  engine: EngineName | null;
 
   /** null = sin sesión. `authReady` indica si ya sabemos cuál de los dos casos es. */
   user: SessionUser | null;
@@ -135,6 +148,7 @@ export const useLineas = create<LineasState>()((set, get) => ({
   errorNeedsEdit: false,
   graphKey: null,
   focus: null,
+  engine: null,
   user: null,
   authReady: false,
   library: {},
@@ -174,12 +188,20 @@ export const useLineas = create<LineasState>()((set, get) => ({
     searchAbort = abort;
     set({ status: "loading", error: null, errorNeedsEdit: false, graphKey: key, lanes: emptyLanes(), graph: null, focus: null, recVotes: {} });
 
+    const startedAt = performance.now();
     const applyEvent = (event: StreamEvent) => {
       if (event.type === "done") return;
       set((s) => {
         const lanes = { ...s.lanes };
         const lane = { ...lanes[event.lane] };
-        if (event.type === "lane") Object.assign(lane, { status: "ready", options: [...lane.options, event.graph], index: lane.options.length, error: null });
+        if (event.type === "lane")
+          Object.assign(lane, {
+            status: "ready",
+            options: [...lane.options, event.graph],
+            sources: [...lane.sources, { cached: event.cached, ms: performance.now() - startedAt }],
+            index: lane.options.length,
+            error: null,
+          });
         if (event.type === "patch") lane.options = lane.options.map((g) => patchBook(g, event.nodeId, event.book));
         if (event.type === "lane-error") Object.assign(lane, lane.options.length ? { error: event.message } : { status: "error", error: event.message });
         lanes[event.lane] = lane;
@@ -189,7 +211,7 @@ export const useLineas = create<LineasState>()((set, get) => ({
     };
 
     try {
-      await streamRecommendations({ clues }, abort.signal, applyEvent);
+      await streamRecommendations({ clues }, abort.signal, applyEvent, (engine) => set({ engine }));
       if (abort.signal.aborted) return;
       const { graph, lanes } = get();
       // Lo que no llegó se marca como error para poder reintentarlo.
@@ -403,17 +425,23 @@ async function requestLane(set: Set, get: Get, lane: Lane) {
   );
   setLane(set, get, lane, { loadingMore: true, error: null });
   let arrived = false;
+  const startedAt = performance.now();
   try {
     await streamRecommendations({ clues, lane, exclude }, searchAbort?.signal, (event) => {
       if (get().graphKey !== graphKey || event.type === "done" || event.lane !== lane) return;
       const current = get().lanes[lane];
       if (event.type === "lane") {
         arrived = true;
-        setLane(set, get, lane, { status: "ready", options: [...current.options, event.graph], index: current.options.length });
+        setLane(set, get, lane, {
+          status: "ready",
+          options: [...current.options, event.graph],
+          sources: [...current.sources, { cached: event.cached, ms: performance.now() - startedAt }],
+          index: current.options.length,
+        });
       }
       if (event.type === "patch") setLane(set, get, lane, { options: current.options.map((g) => patchBook(g, event.nodeId, event.book)) });
       if (event.type === "lane-error") setLane(set, get, lane, current.options.length ? { error: event.message } : { status: "error", error: event.message });
-    });
+    }, (engine) => set({ engine }));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Algo salió mal.";
     setLane(set, get, lane, get().lanes[lane].options.length ? { error: message } : { status: "error", error: message });
@@ -431,7 +459,12 @@ async function requestLane(set: Set, get: Get, lane: Lane) {
 class BlockedError extends Error {}
 
 /** POST /api/recommend y lectura del stream. Los errores antes del stream (400, 429) vienen como JSON. */
-async function streamRecommendations(body: { clues: Clue[]; lane?: Lane; exclude?: ExcludedBook[] }, signal: AbortSignal | undefined, onEvent: (event: StreamEvent) => void) {
+async function streamRecommendations(
+  body: { clues: Clue[]; lane?: Lane; exclude?: ExcludedBook[] },
+  signal: AbortSignal | undefined,
+  onEvent: (event: StreamEvent) => void,
+  onEngine?: (engine: EngineName) => void,
+) {
   const response = await fetch("/api/recommend", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -443,6 +476,8 @@ async function streamRecommendations(body: { clues: Clue[]; lane?: Lane; exclude
     const message = typeof data === "object" && data && "error" in data ? String(data.error) : "Algo salió mal.";
     throw response.status === 422 ? new BlockedError(message) : new Error(message);
   }
+  const engine = response.headers.get("x-lineas-engine");
+  if (engine === "mock" || engine === "openrouter" || engine === "deepseek") onEngine?.(engine);
   // El servidor ya valida, pero el cliente no confía a ciegas en la red: cada evento se valida al leerlo.
   await readEventStream(response.body, onEvent);
 }

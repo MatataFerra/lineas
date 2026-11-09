@@ -9,7 +9,7 @@ import { VoteControl } from "@/components/vote-control";
 import { LANE_META, LANE_ORDER } from "@/lib/graph/labels";
 import { recommendedBook } from "@/lib/graph/merge";
 import type { Lane } from "@/lib/graph/schema";
-import { bookSnapshot, useLineas, type LaneState } from "@/lib/store";
+import { bookSnapshot, useLineas, type LaneState, type OptionSource } from "@/lib/store";
 import { NoClues } from "@/components/no-clues";
 import { authorHref } from "@/lib/authors/link";
 import { LaneSearch } from "./lane-search";
@@ -22,6 +22,7 @@ export function ResultsScreen() {
   const error = useLineas((s) => s.error);
   const errorNeedsEdit = useLineas((s) => s.errorNeedsEdit);
   const search = useLineas((s) => s.search);
+  const engine = useLineas((s) => s.engine);
 
   // Si se entra directo a /resultados (o cambiaron las pistas), buscar.
   useEffect(() => {
@@ -73,6 +74,13 @@ export function ResultsScreen() {
             Editar pistas
           </Link>
         </div>
+
+        {engine === "mock" && status !== "error" && (
+          <p role="status" className="mt-6 rounded-xl border border-line bg-surface px-4 py-3 text-[13px] leading-relaxed">
+            Estás viendo resultados de ejemplo: la IA no está activa y las recomendaciones son siempre las mismas.
+            {process.env.NODE_ENV === "development" && <span className="text-muted"> Sacá LINEAS_ENGINE=mock del entorno y reiniciá el servidor.</span>}
+          </p>
+        )}
 
         {status === "error" && (
           <div role="alert" className="mt-9 rounded-2xl border border-line bg-surface p-6">
@@ -362,8 +370,22 @@ function LaneCard({ lane, state, entrance }: { lane: Lane; state: LaneState; ent
           {state.error}
         </p>
       )}
+      <SourceNote source={state.sources[state.index]} />
     </div>
   );
+}
+
+/** De dónde salió el libro que se ve: así se nota si la IA respondió, si vino del cache o si es el ejemplo fijo. */
+function SourceNote({ source }: { source: OptionSource | undefined }) {
+  const engine = useLineas((s) => s.engine);
+  if (!source) return null;
+  const text =
+    engine === "mock"
+      ? "Ejemplo fijo, sin IA."
+      : source.cached
+        ? "Guardado de una búsqueda anterior con estas pistas."
+        : `Respuesta de la IA en ${(source.ms / 1000).toLocaleString("es-AR", { maximumFractionDigits: 1 })} s.`;
+  return <p className="mt-1 text-center text-[11px] text-muted">{text}</p>;
 }
 
 function joinLabels(labels: string[]): string {
