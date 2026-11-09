@@ -155,29 +155,14 @@ dialog::backdrop {
 }
 
 /* ---------------------------------------------------------------------------
-   Resultados (features/results): la búsqueda de cada carril y la llegada del
-   libro. El hueco se enciende cuando el trazo entra; la búsqueda se apaga en
-   el mismo momento; la tapa aparece en el hueco y el resto la sigue.
+   Resultados (features/results): la espera de cada carril y la llegada del
+   libro. El viento se condensa en la forma de la tapa; la tapa aparece ahí
+   mientras el viento se apaga, y el resto de la card la sigue.
    ------------------------------------------------------------------------ */
-.search-slot {
-  fill: var(--accent);
-  fill-opacity: 0;
-  stroke: var(--edge);
-  stroke-opacity: 0.55;
-  stroke-width: 1.1;
-  stroke-dasharray: 4 4;
-  transition:
-    fill-opacity 200ms var(--ease-strong-out),
-    stroke 200ms var(--ease-strong-out),
-    stroke-opacity 200ms var(--ease-strong-out);
-}
-.search-slot-lit {
-  fill-opacity: 0.08;
-  stroke: var(--accent);
-  stroke-opacity: 1;
-}
-.search-field {
-  transition: opacity 180ms var(--ease-strong-out);
+/* El viento se desvanece en los bordes: el campo no tiene caja. */
+.drift-canvas {
+  mask-image: linear-gradient(to right, transparent, #000 10%, #000 90%, transparent), linear-gradient(to bottom, transparent, #000 6%, #000 94%, transparent);
+  mask-composite: intersect;
 }
 @keyframes lineas-arrive {
   from {

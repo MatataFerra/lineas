@@ -12,7 +12,7 @@ import type { Lane } from "@/lib/graph/schema";
 import { bookSnapshot, useLineas, type LaneState, type OptionSource } from "@/lib/store";
 import { NoClues } from "@/components/no-clues";
 import { authorHref } from "@/lib/authors/link";
-import { LaneSearch } from "./lane-search";
+import { LaneDrift } from "./lane-drift";
 import { LibraryNotice } from "@/features/library/library-notice";
 
 export function ResultsScreen() {
@@ -236,9 +236,9 @@ function Waiting({ lane, landing, leaving, onLanded }: { lane: Lane; landing: bo
 
   return (
     <div className={`flex flex-col ${leaving ? "leave" : ""}`} role="status" aria-hidden={leaving || undefined}>
-      {/* Mismo alto y margen que el bloque de la tapa: el hueco queda donde va a estar el libro. */}
-      <div className="mt-4.5 overflow-x-clip">
-        <LaneSearch lane={lane} landing={landing} onLanded={onLanded} />
+      {/* Mismo alto y margen que el bloque de la tapa: el viento se condensa donde va a estar el libro. */}
+      <div className="mt-4.5">
+        <LaneDrift lane={lane} landing={landing} onLanded={onLanded} />
       </div>
       <p key={late} className="animate-fade font-serif text-[19px] leading-snug text-muted italic">
         {copy}
