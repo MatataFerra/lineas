@@ -53,6 +53,18 @@
   color-scheme: dark;
 }
 
+/* `dark:` sigue al tema que se ve: el del sistema, salvo que data-theme lo fuerce. */
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+  &:where(:root[data-theme="dark"] *) {
+    @slot;
+  }
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
