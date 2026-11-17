@@ -48,7 +48,8 @@ export function SiteHeader() {
         Líneas
       </Link>
 
-      <nav aria-label="Principal" className="hidden gap-9 text-[13px] md:flex">
+      {/* Centrada respecto del encabezado, no del espacio libre: no se mueve cuando cambia lo de los costados. */}
+      <nav aria-label="Principal" className="hidden gap-9 text-[13px] md:absolute md:left-1/2 md:flex md:-translate-x-1/2">
         {NAV.map((item) => {
           const current = item.match.some((m) => pathname === m || (m !== "/" && pathname.startsWith(`${m}/`)));
           return (
@@ -64,8 +65,8 @@ export function SiteHeader() {
         })}
       </nav>
 
+      {/* El tema queda fijo contra el borde; la cuenta, a su izquierda, aparece cuando se sabe la sesión. */}
       <div className="-mr-2.5 flex items-center gap-1 md:mr-0 md:gap-2">
-        <ThemeToggle />
         <div className="hidden md:block">
           {user ? (
             <button
@@ -74,20 +75,24 @@ export function SiteHeader() {
               aria-label="Tu cuenta"
               aria-expanded={menu === "account"}
               onClick={() => setMenu(menu === "account" ? null : "account")}
-              className="flex size-9 items-center justify-center rounded-full border border-line bg-chip font-serif text-[15px] uppercase"
+              className="animate-fade flex size-9 items-center justify-center rounded-full border border-line bg-chip font-serif text-[15px] uppercase"
             >
               {user.email?.charAt(0) ?? <UserIcon />}
             </button>
           ) : (
-            <Link
-              href={loginHref}
-              className={`inline-flex h-9 items-center gap-2 rounded-full border border-line px-3.5 text-[13px] hover:bg-chip ${authReady && pathname !== "/ingresar" ? "" : "invisible"}`}
-            >
-              <UserIcon size={15} />
-              Ingresar
-            </Link>
+            authReady &&
+            pathname !== "/ingresar" && (
+              <Link
+                href={loginHref}
+                className="animate-fade inline-flex h-9 items-center gap-2 rounded-full border border-line px-3.5 text-[13px] hover:bg-chip"
+              >
+                <UserIcon size={15} />
+                Ingresar
+              </Link>
+            )
           )}
         </div>
+        <ThemeToggle />
 
         <button
           type="button"
