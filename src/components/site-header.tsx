@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { getBrowserSupabase } from "@/lib/supabase/client";
 import { useLineas } from "@/lib/store";
 import { MenuIcon, UserIcon } from "./icons";
+import { ThemeToggle } from "./theme-toggle";
 
 const NAV = [
   { href: "/", label: "Descubrir", match: ["/", "/resultados", "/conexiones", "/libro"] },
@@ -19,13 +20,13 @@ export function SiteHeader() {
   const user = useLineas((s) => s.user);
   const authReady = useLineas((s) => s.authReady);
   const [menu, setMenu] = useState<"nav" | "account" | null>(null);
-  const header = useRef<HTMLElement>(null);
 
-  // Un menú abierto se cierra con Escape o con un clic fuera del encabezado.
+  // Un menú abierto se cierra con Escape o con un clic fuera de él y de su botón
+  // (todo el encabezado como "dentro" dejaba franjas donde el clic no cerraba).
   useEffect(() => {
     if (!menu) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenu(null);
-    const onPointer = (e: PointerEvent) => !header.current?.contains(e.target as Node) && setMenu(null);
+    const onPointer = (e: PointerEvent) => !(e.target as Element).closest("[data-menu]") && setMenu(null);
     document.addEventListener("keydown", onKey);
     document.addEventListener("pointerdown", onPointer);
     return () => {
@@ -42,7 +43,7 @@ export function SiteHeader() {
   };
 
   return (
-    <header ref={header} className="relative flex items-center justify-between gap-6">
+    <header className="relative flex items-center justify-between gap-6">
       <Link href="/" className="font-serif text-[26px] tracking-[-0.01em] md:text-[28px]">
         Líneas
       </Link>
@@ -63,40 +64,46 @@ export function SiteHeader() {
         })}
       </nav>
 
-      <div className="hidden md:block">
-        {user ? (
-          <button
-            type="button"
-            aria-label="Tu cuenta"
-            aria-expanded={menu === "account"}
-            onClick={() => setMenu(menu === "account" ? null : "account")}
-            className="flex size-9 items-center justify-center rounded-full border border-line bg-chip font-serif text-[15px] uppercase"
-          >
-            {user.email?.charAt(0) ?? <UserIcon />}
-          </button>
-        ) : (
-          <Link
-            href={loginHref}
-            className={`inline-flex h-9 items-center gap-2 rounded-full border border-line px-3.5 text-[13px] hover:bg-chip ${authReady && pathname !== "/ingresar" ? "" : "invisible"}`}
-          >
-            <UserIcon size={15} />
-            Ingresar
-          </Link>
-        )}
-      </div>
+      <div className="-mr-2.5 flex items-center gap-1 md:mr-0 md:gap-2">
+        <ThemeToggle />
+        <div className="hidden md:block">
+          {user ? (
+            <button
+              type="button"
+              data-menu
+              aria-label="Tu cuenta"
+              aria-expanded={menu === "account"}
+              onClick={() => setMenu(menu === "account" ? null : "account")}
+              className="flex size-9 items-center justify-center rounded-full border border-line bg-chip font-serif text-[15px] uppercase"
+            >
+              {user.email?.charAt(0) ?? <UserIcon />}
+            </button>
+          ) : (
+            <Link
+              href={loginHref}
+              className={`inline-flex h-9 items-center gap-2 rounded-full border border-line px-3.5 text-[13px] hover:bg-chip ${authReady && pathname !== "/ingresar" ? "" : "invisible"}`}
+            >
+              <UserIcon size={15} />
+              Ingresar
+            </Link>
+          )}
+        </div>
 
-      <button
-        type="button"
-        aria-label={menu === "nav" ? "Cerrar menú" : "Abrir menú"}
-        aria-expanded={menu === "nav"}
-        onClick={() => setMenu(menu === "nav" ? null : "nav")}
-        className="-mr-2.5 flex size-11 items-center justify-center md:hidden"
-      >
-        <MenuIcon size={20} />
-      </button>
+        <button
+          type="button"
+          data-menu
+          aria-label={menu === "nav" ? "Cerrar menú" : "Abrir menú"}
+          aria-expanded={menu === "nav"}
+          onClick={() => setMenu(menu === "nav" ? null : "nav")}
+          className="flex size-11 items-center justify-center md:hidden"
+        >
+          <MenuIcon size={20} />
+        </button>
+      </div>
 
       {menu && (
         <div
+          data-menu
           className={`animate-fade absolute top-full right-0 z-30 mt-2 flex w-56 flex-col rounded-xl border border-line bg-surface p-2 text-sm shadow-lg ${menu === "account" ? "hidden md:flex" : "md:hidden"}`}
         >
           {user && <div className="truncate px-3 pt-1.5 pb-2 text-xs text-muted">{user.email}</div>}
