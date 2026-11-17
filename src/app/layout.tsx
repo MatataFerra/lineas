@@ -6,9 +6,16 @@ import { AuthListener } from "@/components/auth-listener";
 import { THEME_COLORS, THEME_SCRIPT, type Theme } from "@/lib/theme";
 import "./globals.css";
 
+const description = "No sabés qué leer. Pero sabés qué te mueve.";
+
+// Íconos e imagen para compartir salen de los archivos de esta carpeta (icon.svg, opengraph-image.png…).
 export const metadata: Metadata = {
+  // URLs absolutas para OpenGraph. En Vercel, sin la variable, Next usa el dominio de producción.
+  metadataBase: process.env.NEXT_PUBLIC_SITE_URL ? new URL(process.env.NEXT_PUBLIC_SITE_URL) : undefined,
   title: "Líneas",
-  description: "No sabés qué leer. Pero sabés qué te mueve.",
+  description,
+  openGraph: { type: "website", locale: "es_AR", siteName: "Líneas", title: "Líneas", description },
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
