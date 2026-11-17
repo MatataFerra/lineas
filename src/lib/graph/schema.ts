@@ -14,6 +14,8 @@ export const GRAPH_LIMITS = {
   maxNodes: 16,
   /** Saltos máximos desde una pista hasta una recomendación. */
   maxHops: 2,
+  /** Lo que se acepta si el modelo se pasa: un salto de más es mejor que un carril vacío. */
+  maxPathHops: 3,
   /** Recomendaciones por carril en un grafo completo (el de ejemplo). */
   maxPerLane: 3,
   /** Nodos máximos que puede traer la respuesta de un solo carril. */
@@ -287,8 +289,8 @@ function graphSchema(rules: GraphRules) {
       if (last !== rec.nodeId) {
         ctx.addIssue({ code: "custom", path: ["recommendations", i, "path"], message: "El recorrido tiene que terminar en el libro recomendado" });
       }
-      if (rec.path.length - 1 > GRAPH_LIMITS.maxHops) {
-        ctx.addIssue({ code: "custom", path: ["recommendations", i, "path"], message: `Máximo ${GRAPH_LIMITS.maxHops} saltos` });
+      if (rec.path.length - 1 > GRAPH_LIMITS.maxPathHops) {
+        ctx.addIssue({ code: "custom", path: ["recommendations", i, "path"], message: `Máximo ${GRAPH_LIMITS.maxPathHops} saltos` });
       }
       for (let k = 0; k < rec.path.length - 1; k++) {
         if (!linked.has(pairKey(rec.path[k], rec.path[k + 1]))) {

@@ -18,13 +18,21 @@ describe("ConnectionGraphSchema", () => {
     expect(result.error?.issues.map((i) => i.message)).toContain("No hay arista entre on-the-road y rayuela");
   });
 
-  it("rechaza recorridos más largos que el máximo de saltos", () => {
+  it("tolera un salto más del que se pide antes que dejar el carril vacío", () => {
+    const long = structuredClone(MOCK_GRAPH);
+    long.recommendations[0].path = ["generacion-beat", "on-the-road", "charlie-parker", "rayuela"];
+    long.recommendations[0].nodeId = "rayuela";
+    const result = ConnectionGraphSchema.safeParse(long);
+    expect(result.error?.issues.some((i) => i.message.startsWith("Máximo"))).toBeFalsy();
+  });
+
+  it("rechaza recorridos más largos que el máximo tolerado", () => {
     const bad = structuredClone(MOCK_GRAPH);
-    bad.recommendations[0].path = ["generacion-beat", "on-the-road", "charlie-parker", "rayuela"];
+    bad.recommendations[0].path = ["generacion-beat", "on-the-road", "charlie-parker", "on-the-road", "rayuela"];
     bad.recommendations[0].nodeId = "rayuela";
     const result = ConnectionGraphSchema.safeParse(bad);
     expect(result.success).toBe(false);
-    expect(result.error?.issues.some((i) => i.message === `Máximo ${GRAPH_LIMITS.maxHops} saltos`)).toBe(true);
+    expect(result.error?.issues.some((i) => i.message === `Máximo ${GRAPH_LIMITS.maxPathHops} saltos`)).toBe(true);
   });
 
   it("exige la frase en una arista de frase compartida", () => {
