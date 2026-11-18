@@ -10,7 +10,8 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const rincon = rinconBySlug((await params).slug);
-  return { title: rincon ? `${rincon.title} · Explorar · Líneas` : "Explorar · Líneas", description: rincon?.intro };
+  if (!rincon) return { title: "Explorar · Líneas" };
+  return { title: `${rincon.title} · Explorar · Líneas`, description: rincon.intro, openGraph: { title: rincon.title, description: rincon.intro } };
 }
 
 export default function Page({ params }: { params: Promise<{ slug: string }> }) {
