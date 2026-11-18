@@ -1,6 +1,6 @@
 "use client";
 
-import { THEME_KEY } from "@/lib/theme";
+import { THEME_KEY, applyTheme } from "@/lib/theme";
 import { MoonIcon, SunIcon } from "./icons";
 
 /**
@@ -12,7 +12,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
     const root = document.documentElement;
     const current = root.dataset.theme ?? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
     const next = current === "dark" ? "light" : "dark";
-    root.dataset.theme = next;
+    applyTheme(next);
     try {
       localStorage.setItem(THEME_KEY, next);
     } catch {
